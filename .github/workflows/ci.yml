@@ -1,0 +1,38 @@
+name: CI
+
+# PRs get one run per push to their branch (via pull_request); main gets a
+# run after each merge. Feature-branch pushes without a PR don't run, so a PR
+# branch is never tested twice for the same commit.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Superseded PR runs are cancelled; every main run finishes.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test (script tests, then TypeScript tests)
+        run: npm test
+      - name: Build (default Vercel/Nitro output)
+        run: npm run build
+      - name: Build (static GitHub Pages output)
+        run: npm run build:pages

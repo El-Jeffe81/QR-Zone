@@ -1,5 +1,9 @@
 # QR Zone
 
+[![CI](https://github.com/El-Jeffe81/QR-Zone/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/El-Jeffe81/QR-Zone/actions/workflows/ci.yml)
+
+CI badge: green = tests and both builds pass (typecheck, lint, `npm test`, `npm run build` and `npm run build:pages` on Node 22).
+
 A QR code generator. Type a URL or any text and the code redraws immediately. Set foreground and background colors, dot shape, corner style, module size, and error correction, then download a PNG.
 
 **Live:** https://el-jeffe81.github.io/QR-Zone/
