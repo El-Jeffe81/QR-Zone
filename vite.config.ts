@@ -160,6 +160,10 @@ const staticPages = process.env.STATIC_PAGES === "1";
 // AGENTS.md § "First scaffold".
 export default defineConfig(({ command, isPreview }) => ({
   ...(staticPages ? { base: `${PAGES_BASE_PATH}/` } : {}),
+  // Lets app code drop links to files only the Nitro server can serve.
+  define: {
+    "import.meta.env.VITE_STATIC_PAGES": JSON.stringify(staticPages ? "1" : ""),
+  },
   server: {
     host: "0.0.0.0",
     port: 8080,
