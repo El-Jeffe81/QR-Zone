@@ -60,6 +60,14 @@ Open the local preview, enter a link, and download the PNG.
 | `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
 | `npm run build` | Default production build (Vercel/Nitro output in `.vercel/output`) |
 | `npm run build:pages` | Static build for GitHub Pages, served under `/QR-Zone/`, written to `dist/client` |
+| `npm run test:e2e` | Browser smoke test of the static build (run `npm run build:pages` first; needs Chromium from `npx playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to a local Chrome) |
+| `npm run test:golden:update` | Regenerate the golden render hashes (see below) |
+
+### Golden renders
+
+`src/lib/qr/golden.test.ts` renders one fixed, seeded image per frame shape and compares its SHA-256 with `src/lib/qr/golden-hashes.json`. Any pixel change fails `npm test`, including changes from the renderer, the frame layout, the decorative pattern, or a `qrcode` upgrade.
+
+When a change to the image is intended, run `npm run test:golden:update`, check the new look in the app, and commit the updated JSON in the same commit as the change. Don't update the hashes to silence an unexpected failure.
 
 ## Deploy (GitHub Pages)
 

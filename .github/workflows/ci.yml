@@ -16,9 +16,12 @@ concurrency:
   # Superseded PR runs are cancelled; every main run finishes.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Tests run once, without retries: a flaky test should fail CI, not pass on
+# a second try.
 jobs:
   check:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -36,3 +39,34 @@ jobs:
         run: npm run build
       - name: Build (static GitHub Pages output)
         run: npm run build:pages
+
+  smoke:
+    name: Browser smoke test (Chromium)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Chromium system dependencies (browser restored from cache)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - name: Build (static GitHub Pages output)
+        run: npm run build:pages
+      - name: Smoke test under /QR-Zone/
+        run: npm run test:e2e
