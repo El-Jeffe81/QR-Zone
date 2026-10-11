@@ -93,6 +93,13 @@ describe("static Pages build smoke test", () => {
     assert.deepEqual(problems, []);
   });
 
+  it("does not publish the project zip", async () => {
+    assert.ok(!existsSync(`${ROOT}/QR-Zone.zip`), "QR-Zone.zip is in the Pages build");
+    const response = await page.request.get(`${server.url}QR-Zone.zip`);
+    assert.equal(response.status(), 404);
+    assert.equal(await page.locator('a[href$=".zip"]').count(), 0, "page still links a zip");
+  });
+
   it("fits a 1280×800 screen with a frame on, without page scroll", async () => {
     const { scrollHeight, innerHeight, scrollWidth, innerWidth } = await page.evaluate(() => ({
       scrollHeight: document.documentElement.scrollHeight,
