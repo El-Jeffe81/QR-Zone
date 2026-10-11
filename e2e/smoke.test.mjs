@@ -10,6 +10,8 @@ import { serveStatic } from "./static-server.mjs";
 
 const ROOT = "dist/client";
 const TEXT = "https://el-jeffe81.github.io/QR-Zone/?from=smoke";
+/** The layout is meant to fit a 1280×800 screen without scrolling. */
+const VIEWPORT = { width: 1280, height: 800 };
 
 /** Decodes a PNG data URL inside the page and returns its RGBA pixels. */
 async function pixelsOf(page, dataUrl) {
@@ -45,7 +47,7 @@ describe("static Pages build smoke test", () => {
       // Lets a machine with a system Chrome run this without a Playwright download.
       executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined,
     });
-    const context = await browser.newContext({ acceptDownloads: true });
+    const context = await browser.newContext({ acceptDownloads: true, viewport: VIEWPORT });
     page = await context.newPage();
     page.on("pageerror", (error) => problems.push(`page error: ${error.message}`));
     page.on("console", (message) => {
@@ -87,6 +89,53 @@ describe("static Pages build smoke test", () => {
     const downloaded = `data:image/png;base64,${file.toString("base64")}`;
     assert.equal(decode(await pixelsOf(page, downloaded)), TEXT, "download does not decode");
     assert.equal(downloaded, previewSrc, "download differs from the preview");
+
+    assert.deepEqual(problems, []);
+  });
+
+  it("fits a 1280×800 screen with a frame on, without page scroll", async () => {
+    const { scrollHeight, innerHeight, scrollWidth, innerWidth } = await page.evaluate(() => ({
+      scrollHeight: document.documentElement.scrollHeight,
+      innerHeight: window.innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    }));
+    assert.equal(innerHeight, VIEWPORT.height);
+    assert.ok(scrollHeight <= innerHeight, `page is ${scrollHeight}px tall in ${innerHeight}px`);
+    assert.ok(scrollWidth <= innerWidth, `page is ${scrollWidth}px wide in ${innerWidth}px`);
+  });
+
+  it("opens the large view with Close focused, shows a code that decodes, and returns focus", async () => {
+    const focusedName = () =>
+      page.evaluate(() => {
+        const active = document.activeElement;
+        return active?.getAttribute("aria-label") ?? active?.textContent?.trim() ?? null;
+      });
+    const dialog = page.getByRole("dialog", { name: "QR code, large view" });
+    const smallWidth = (await page.locator("main img.qr-preview").first().boundingBox()).width;
+
+    // Open with the expand button next to Download; close with Close.
+    await page.getByRole("button", { name: "Expand preview" }).click();
+    await dialog.waitFor();
+    assert.equal(await focusedName(), "Close");
+    const large = dialog.getByRole("img");
+    const box = await large.boundingBox();
+    assert.ok(box.width > smallWidth, `large view ${box.width}px vs preview ${smallWidth}px`);
+    // Decode what is actually on screen, at its displayed size.
+    const shot = await large.screenshot();
+    const shown = `data:image/png;base64,${shot.toString("base64")}`;
+    assert.equal(decode(await pixelsOf(page, shown)), TEXT, "large view does not decode");
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(await focusedName(), "Expand preview");
+
+    // Open by clicking the preview itself; Escape closes and focus returns to it.
+    await page.getByRole("button", { name: "Open large preview" }).click();
+    await dialog.waitFor();
+    assert.equal(await focusedName(), "Close");
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(await focusedName(), "Open large preview");
 
     assert.deepEqual(problems, []);
   });
