@@ -4,7 +4,14 @@
  */
 import type { FrameColorMode } from "./color.ts";
 import { FRAME_SHAPES, type FrameShape } from "./frames.ts";
-import { CORNER_STYLES, DOT_SHAPES, type CornerStyle, type DotShape } from "./render.ts";
+import {
+  CORNER_STYLES,
+  DOT_SHAPES,
+  FRAME_FILLS,
+  type CornerStyle,
+  type DotShape,
+  type FrameFill,
+} from "./render.ts";
 
 export type Ecc = "L" | "M" | "Q" | "H";
 
@@ -42,6 +49,24 @@ export const FRAME_SHAPE_OPTIONS: readonly { id: FrameShape; name: string }[] = 
   { id: "hexagon", name: "Hexagon" },
   { id: "star", name: "Star" },
   { id: "heart", name: "Heart" },
+  { id: "castle", name: "Castle" },
+  { id: "cloud", name: "Cloud" },
+  { id: "rectangle", name: "Rectangle" },
+  { id: "octagon", name: "Octagon" },
+  { id: "house", name: "House" },
+  { id: "sun", name: "Sun" },
+  { id: "moon", name: "Moon" },
+  { id: "shield", name: "Shield" },
+  { id: "speech-bubble", name: "Speech bubble" },
+  { id: "map-pin", name: "Map pin" },
+  { id: "gear", name: "Gear" },
+  { id: "paw-print", name: "Paw print" },
+  { id: "ticket", name: "Ticket" },
+];
+
+export const FRAME_FILL_OPTIONS: readonly { id: FrameFill; name: string; note: string }[] = [
+  { id: "dots", name: "Dots", note: "A dot pattern in the frame color" },
+  { id: "solid", name: "Solid", note: "The whole shape in the frame color" },
 ];
 
 export const FRAME_COLOR_OPTIONS: readonly { id: FrameColorMode; name: string; note: string }[] = [
@@ -62,6 +87,7 @@ export interface Settings {
   cornerStyle: CornerStyle;
   frameShape: FrameShape;
   frameColorMode: FrameColorMode;
+  frameFill: FrameFill;
   /** Used when frameColorMode is "custom". */
   frameColor: string;
 }
@@ -76,6 +102,7 @@ export const DEFAULT_SETTINGS: Settings = {
   cornerStyle: "square",
   frameShape: "none",
   frameColorMode: "match",
+  frameFill: "dots",
   frameColor: DEFAULT_FRAME_COLOR,
 };
 
@@ -112,6 +139,10 @@ export function isFrameColorMode(value: unknown): value is FrameColorMode {
   return value === "match" || value === "tint" || value === "custom";
 }
 
+export function isFrameFill(value: unknown): value is FrameFill {
+  return FRAME_FILLS.includes(value as FrameFill);
+}
+
 export function isCornerStyle(value: unknown): value is CornerStyle {
   return CORNER_STYLES.includes(value as CornerStyle);
 }
@@ -119,7 +150,8 @@ export function isCornerStyle(value: unknown): value is CornerStyle {
 /**
  * Settings from a stored `qr-zone:v1` document. Missing, invalid or
  * unreadable fields fall back to the defaults, so data saved before a field
- * existed (e.g. without dot shape, corner style or frame) still loads.
+ * existed (e.g. without dot shape, corner style, frame or frame fill) still
+ * loads.
  */
 export function parseSettings(raw: string | null | undefined): Settings {
   const settings = { ...DEFAULT_SETTINGS };
@@ -148,6 +180,7 @@ export function parseSettings(raw: string | null | undefined): Settings {
   if (isCornerStyle(saved.cornerStyle)) settings.cornerStyle = saved.cornerStyle;
   if (isFrameShape(saved.frameShape)) settings.frameShape = saved.frameShape;
   if (isFrameColorMode(saved.frameColorMode)) settings.frameColorMode = saved.frameColorMode;
+  if (isFrameFill(saved.frameFill)) settings.frameFill = saved.frameFill;
   if (isHex(saved.frameColor)) settings.frameColor = saved.frameColor.toLowerCase();
   return settings;
 }

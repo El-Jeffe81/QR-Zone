@@ -4,12 +4,13 @@ import { Ban, Download, Maximize2, QrCode, TriangleAlert, X } from "lucide-react
 import { contrastWarning, frameColorFor, type FrameColorMode } from "@/lib/qr/color";
 import { frameIcon } from "@/lib/qr/frame-icons";
 import type { FrameShape } from "@/lib/qr/frames";
-import { renderQr, type CornerStyle, type DotShape } from "@/lib/qr/render";
+import { renderQr, type CornerStyle, type DotShape, type FrameFill } from "@/lib/qr/render";
 import {
   CORNER_STYLE_OPTIONS,
   DEFAULT_SETTINGS,
   DOT_SHAPE_OPTIONS,
   FRAME_COLOR_OPTIONS,
+  FRAME_FILL_OPTIONS,
   FRAME_SHAPE_OPTIONS,
   HEX,
   MODULE_MAX,
@@ -51,6 +52,7 @@ type PaintOptions = {
   cornerStyle: CornerStyle;
   frameShape: FrameShape;
   frameColor: string;
+  frameFill: FrameFill;
 };
 
 function friendlyError(error: unknown) {
@@ -66,12 +68,14 @@ function paint(canvas: HTMLCanvasElement, options: PaintOptions): Meta {
   const symbol = create(text, { errorCorrectionLevel: ecc });
   const modules = symbol.modules.size;
   // The PNG is these exact pixels: the preview <img> and the download both
-  // come from this canvas. The seed (text plus every visual setting) makes
-  // the decorative frame pattern repeatable.
+  // come from this canvas. The seed (text plus the visual settings) makes
+  // the decorative frame pattern repeatable. The fill is left out, so dot
+  // patterns stay the same as before the fill option existed.
+  const { frameFill: _fill, ...seeded } = options;
   const image = renderQr(symbol.modules, {
     ...style,
     quietModules: QUIET_MODULES,
-    seed: JSON.stringify(options),
+    seed: JSON.stringify(seeded),
   });
   canvas.width = image.width;
   canvas.height = image.height;
@@ -234,9 +238,14 @@ function Segmented<T extends string>({
 
 function FrameShapeIcon({ shape }: { shape: FrameShape }) {
   const icon = frameIcon(shape);
-  if (!icon) return <Ban className="size-5" aria-hidden="true" />;
+  if (!icon) return <Ban className="size-5 sm:size-[1.125rem]" aria-hidden="true" />;
   return (
-    <svg viewBox={icon.viewBox} className="size-5" aria-hidden="true" focusable="false">
+    <svg
+      viewBox={icon.viewBox}
+      className="size-5 sm:size-[1.125rem]"
+      aria-hidden="true"
+      focusable="false"
+    >
       <path d={icon.d} fill="currentColor" />
     </svg>
   );
@@ -255,17 +264,17 @@ function FramePicker({
     <fieldset role="radiogroup" className="min-w-0" aria-describedby={hintId}>
       <legend className="text-sm font-medium">Frame shape</legend>
       <p id={hintId} className="sr-only">
-        Cuts the image to a shape and fills it with decorative dots. The code itself stays square
-        in the middle.
+        Cuts the image to a shape and fills it with decorative dots. The code itself stays square in
+        the middle.
       </p>
-      <div className="mt-1.5 grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap">
+      <div className="mt-1.5 grid grid-cols-6 gap-1.5 sm:grid-cols-[repeat(auto-fill,2.25rem)]">
         {FRAME_SHAPE_OPTIONS.map((option) => {
           const selected = value === option.id;
           return (
             <label
               key={option.id}
               title={option.name}
-              className={`relative flex h-11 cursor-pointer items-center justify-center rounded-lg border sm:w-11 ${RADIO_FOCUS} ${
+              className={`relative flex h-11 cursor-pointer items-center justify-center rounded-lg border sm:size-9 ${RADIO_FOCUS} ${
                 selected
                   ? "border-accent bg-accent-soft text-accent shadow-[inset_0_0_0_1px_var(--color-accent)]"
                   : "border-line bg-field text-ink hover:border-muted"
@@ -314,6 +323,7 @@ export function QrStudio() {
     DEFAULT_SETTINGS.frameColorMode,
   );
   const [frameColor, setFrameColor] = useState(DEFAULT_SETTINGS.frameColor);
+  const [frameFill, setFrameFill] = useState<FrameFill>(DEFAULT_SETTINGS.frameFill);
   const [hydrated, setHydrated] = useState(false);
   const [expanded, setExpanded] = useState(false);
   /** The button that opened the large view, so focus can go back to it. */
@@ -356,6 +366,7 @@ export function QrStudio() {
     setFrameShape(saved.frameShape);
     setFrameColorMode(saved.frameColorMode);
     setFrameColor(saved.frameColor);
+    setFrameFill(saved.frameFill);
     setHydrated(true);
   }, []);
 
@@ -374,6 +385,7 @@ export function QrStudio() {
           cornerStyle,
           frameShape,
           frameColorMode,
+          frameFill,
           frameColor,
         }),
       );
@@ -391,6 +403,7 @@ export function QrStudio() {
     cornerStyle,
     frameShape,
     frameColorMode,
+    frameFill,
     frameColor,
   ]);
 
@@ -416,6 +429,7 @@ export function QrStudio() {
         cornerStyle,
         frameShape,
         frameColor: resolvedFrameColor,
+        frameFill,
       });
       setImageUrl(canvas.toDataURL("image/png"));
       setMeta(next);
@@ -425,7 +439,18 @@ export function QrStudio() {
       setMeta(null);
       setError(friendlyError(err));
     }
-  }, [content, usedEcc, fg, bg, moduleSize, dotShape, cornerStyle, frameShape, resolvedFrameColor]);
+  }, [
+    content,
+    usedEcc,
+    fg,
+    bg,
+    moduleSize,
+    dotShape,
+    cornerStyle,
+    frameShape,
+    resolvedFrameColor,
+    frameFill,
+  ]);
 
   const warning = imageUrl ? contrastWarning(fg, bg) : null;
   const statusText = error
@@ -487,7 +512,11 @@ export function QrStudio() {
               className="relative block aspect-square w-full cursor-zoom-in overflow-hidden rounded-xl border border-line bg-field disabled:cursor-default"
             >
               {imageUrl ? (
-                <img src={imageUrl} alt={altText} className="qr-preview h-full w-full" />
+                <img
+                  src={imageUrl}
+                  alt={altText}
+                  className="qr-preview h-full w-full object-contain"
+                />
               ) : (
                 <span className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted">
                   {error ? (
@@ -495,7 +524,9 @@ export function QrStudio() {
                   ) : (
                     <QrCode className="size-6" aria-hidden="true" />
                   )}
-                  {error ? "This text can’t be encoded yet." : "Your code appears here as you type."}
+                  {error
+                    ? "This text can’t be encoded yet."
+                    : "Your code appears here as you type."}
                 </span>
               )}
             </button>
@@ -525,7 +556,9 @@ export function QrStudio() {
               aria-live="polite"
               className={`mt-1.5 flex justify-center gap-1.5 text-center text-xs ${error || warning ? "text-warn" : "text-muted"}`}
             >
-              {(error || warning) && <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />}
+              {(error || warning) && (
+                <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />
+              )}
               <span>
                 {statusText}
                 {reducedToFit && meta ? ` Module size reduced to ${meta.modulePx} px to fit.` : ""}
@@ -541,7 +574,9 @@ export function QrStudio() {
                 URL or text
               </label>
               <span className="ml-auto text-xs text-muted tabular-nums" id={hintId}>
-                {content.length === 0 ? "Links and plain text both work." : `${content.length} characters`}
+                {content.length === 0
+                  ? "Links and plain text both work."
+                  : `${content.length} characters`}
               </span>
               <button
                 type="button"
@@ -631,14 +666,24 @@ export function QrStudio() {
             </div>
 
             <div className="flex min-w-0 flex-col gap-2">
-              <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)]">
-                <FramePicker value={frameShape} onChange={setFrameShape} />
-                {frameShape !== "none" && (
-                  <div className="flex min-w-0 flex-wrap items-end gap-2">
+              <FramePicker value={frameShape} onChange={setFrameShape} />
+              {frameShape !== "none" && (
+                <div className="flex min-w-0 flex-wrap items-end gap-x-4 gap-y-3">
+                  <div className="min-w-0 basis-36">
+                    <Segmented
+                      legend="Frame fill"
+                      hint="Fill the frame with a dot pattern, or with one solid color."
+                      name="frame-fill"
+                      options={FRAME_FILL_OPTIONS}
+                      value={frameFill}
+                      onChange={setFrameFill}
+                    />
+                  </div>
+                  <div className="flex min-w-0 grow basis-64 flex-wrap items-end gap-2">
                     <div className="min-w-0 flex-1">
                       <Segmented
                         legend="Frame color"
-                        hint="Color of the decorative dots around the code."
+                        hint="Color of the frame around the code."
                         name="frame-color"
                         options={FRAME_COLOR_OPTIONS}
                         value={frameColorMode}
@@ -654,8 +699,8 @@ export function QrStudio() {
                       />
                     )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
               {frameShape !== "none" && usedEcc !== ecc && (
                 <p className="text-xs text-warn">
                   Frames use at least Quartile, so Quartile is used while a frame is on. Your choice
@@ -683,7 +728,9 @@ export function QrStudio() {
                     Module size
                   </label>
                   <output htmlFor={sizeId} className="text-xs text-muted tabular-nums">
-                    {reducedToFit && meta ? `${meta.modulePx} px (reduced to fit)` : `${moduleSize} px`}
+                    {reducedToFit && meta
+                      ? `${meta.modulePx} px (reduced to fit)`
+                      : `${moduleSize} px`}
                     {meta ? ` · ${meta.px}×${meta.px}` : ""}
                   </output>
                 </div>
@@ -770,7 +817,7 @@ function PreviewDialog({
         <img
           src={imageUrl}
           alt={alt}
-          className="qr-preview size-[min(92vw,calc(100svh-6rem))] rounded-xl bg-field"
+          className="qr-preview size-[min(92vw,calc(100svh-6rem))] rounded-xl bg-field object-contain"
         />
         <div className="flex gap-2">
           <button

@@ -1,7 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { FRAME_SHAPES } from "./frames.ts";
 import {
   DEFAULT_SETTINGS,
+  FRAME_FILL_OPTIONS,
+  FRAME_SHAPE_OPTIONS,
   LEGACY_STORAGE_KEY,
   STORAGE_KEY,
   SWATCHES,
@@ -52,6 +55,7 @@ describe("parseSettings", () => {
       cornerStyle: "square",
       frameShape: "none",
       frameColorMode: "match",
+      frameFill: "dots",
       frameColor: DEFAULT_SETTINGS.frameColor,
     });
   });
@@ -77,6 +81,7 @@ describe("parseSettings", () => {
         cornerStyle: null,
         frameShape: "blob",
         frameColorMode: "rainbow",
+        frameFill: "striped",
         frameColor: "blue",
       }),
     );
@@ -101,9 +106,40 @@ describe("frame settings", () => {
     assert.deepEqual(parseSettings(serializeSettings(saved)), saved);
   });
 
-  it("defaults to no frame, matching color", () => {
+  it("defaults to no frame, matching color, dot fill", () => {
     assert.equal(DEFAULT_SETTINGS.frameShape, "none");
     assert.equal(DEFAULT_SETTINGS.frameColorMode, "match");
+    assert.equal(DEFAULT_SETTINGS.frameFill, "dots");
+  });
+
+  it("round-trips the added shapes and solid fill", () => {
+    for (const frameShape of FRAME_SHAPES) {
+      const saved = { ...DEFAULT_SETTINGS, frameShape, frameFill: "solid" } as const;
+      assert.deepEqual(parseSettings(serializeSettings(saved)), saved);
+    }
+  });
+
+  it("data saved before frame fill existed loads with Dots", () => {
+    const old = JSON.stringify({ frameShape: "heart", frameColorMode: "tint" });
+    const parsed = parseSettings(old);
+    assert.equal(parsed.frameShape, "heart");
+    assert.equal(parsed.frameColorMode, "tint");
+    assert.equal(parsed.frameFill, "dots");
+    for (const frameFill of [null, 1, "Solid", "", {}]) {
+      assert.equal(parseSettings(JSON.stringify({ frameFill })).frameFill, "dots");
+    }
+  });
+
+  it("offers a named option for every frame shape and both fills", () => {
+    assert.deepEqual(
+      FRAME_SHAPE_OPTIONS.map((option) => option.id),
+      [...FRAME_SHAPES],
+    );
+    assert.equal(new Set(FRAME_SHAPE_OPTIONS.map((option) => option.name)).size, 21);
+    assert.deepEqual(
+      FRAME_FILL_OPTIONS.map((option) => option.id),
+      ["dots", "solid"],
+    );
   });
 
   it("keeps valid fields and defaults the rest of partial or wrongly typed data", () => {
