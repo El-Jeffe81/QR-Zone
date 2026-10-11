@@ -149,8 +149,8 @@ function authPopupPlugin(): Plugin {
  * `dist/client/index.html`, and Nitro (the Vercel server) is skipped. Without
  * the flag the build is the default Vercel/Nitro output.
  *
- * `crawlLinks` stays off: the crawler follows the project-zip link and writes
- * a rendered response over `QR-Zone.zip`.
+ * `crawlLinks` stays off: there is a single route, so there is nothing to
+ * crawl, and only the pages listed are written.
  */
 const PAGES_BASE_PATH = "/QR-Zone";
 const staticPages = process.env.STATIC_PAGES === "1";

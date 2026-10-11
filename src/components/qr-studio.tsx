@@ -467,13 +467,6 @@ export function QrStudio() {
             Type a URL or any text, pick a style, save a PNG.
           </p>
         </div>
-        <a
-          href={`${import.meta.env.BASE_URL}QR-Zone.zip`}
-          download="QR-Zone.zip"
-          className="shrink-0 text-xs font-medium text-accent underline underline-offset-4 hover:text-accent-hover"
-        >
-          Project zip
-        </a>
       </header>
 
       <div className="mt-3 lg:grid lg:grid-cols-[29rem_minmax(0,1fr)] lg:items-start lg:gap-6">

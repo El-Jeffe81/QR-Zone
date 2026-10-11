@@ -81,6 +81,10 @@ mkdir -p /tmp/pages && rm -rf /tmp/pages/QR-Zone && cp -r dist/client /tmp/pages
 npx serve /tmp/pages   # or any static server; then open /QR-Zone/
 ```
 
+### Source snapshot
+
+`archive/QR-Zone.zip` is a zip of the project source, kept in the repository only. It is not part of the site or of either build. Refresh it by hand with `sh scripts/make-project-zip.sh` (it packs the committed tree at `HEAD`) and commit the result.
+
 ## History
 
 This project was called **Quiet Zone** and lived at `El-Jeffe81/QR_Generator`. GitHub redirects the old repository URL, but the old Pages address (`https://el-jeffe81.github.io/QR_Generator/`) no longer works; use https://el-jeffe81.github.io/QR-Zone/.
