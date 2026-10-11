@@ -2,6 +2,8 @@
  * Saved editor settings and color presets, kept free of React and the DOM so
  * they can be unit-tested.
  */
+import type { FrameColorMode } from "./color.ts";
+import { FRAME_SHAPES, type FrameShape } from "./frames.ts";
 import { CORNER_STYLES, DOT_SHAPES, type CornerStyle, type DotShape } from "./render.ts";
 
 export type Ecc = "L" | "M" | "Q" | "H";
@@ -31,6 +33,25 @@ export const CORNER_STYLE_OPTIONS: readonly { id: CornerStyle; name: string; not
   { id: "circle", name: "Circle", note: "Round eyes" },
 ];
 
+export const FRAME_SHAPE_OPTIONS: readonly { id: FrameShape; name: string }[] = [
+  { id: "none", name: "None" },
+  { id: "circle", name: "Circle" },
+  { id: "rounded", name: "Rounded square" },
+  { id: "diamond", name: "Diamond" },
+  { id: "triangle", name: "Triangle" },
+  { id: "hexagon", name: "Hexagon" },
+  { id: "star", name: "Star" },
+  { id: "heart", name: "Heart" },
+];
+
+export const FRAME_COLOR_OPTIONS: readonly { id: FrameColorMode; name: string; note: string }[] = [
+  { id: "match", name: "Match code", note: "Same as the code" },
+  { id: "tint", name: "Lighter tint", note: "Softer than the code" },
+  { id: "custom", name: "Custom", note: "Pick any color" },
+];
+
+export const DEFAULT_FRAME_COLOR = "#2f5d8a";
+
 export interface Settings {
   content: string;
   fg: string;
@@ -39,6 +60,10 @@ export interface Settings {
   moduleSize: number;
   dotShape: DotShape;
   cornerStyle: CornerStyle;
+  frameShape: FrameShape;
+  frameColorMode: FrameColorMode;
+  /** Used when frameColorMode is "custom". */
+  frameColor: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -49,7 +74,21 @@ export const DEFAULT_SETTINGS: Settings = {
   moduleSize: 8,
   dotShape: "square",
   cornerStyle: "square",
+  frameShape: "none",
+  frameColorMode: "match",
+  frameColor: DEFAULT_FRAME_COLOR,
 };
+
+const ECC_ORDER: readonly Ecc[] = ["L", "M", "Q", "H"];
+
+/**
+ * Error correction actually used. Frames put decoration close to the code,
+ * so they need at least Quartile; with no frame the user's choice stands.
+ */
+export function effectiveEcc(chosen: Ecc, frameShape: FrameShape): Ecc {
+  if (frameShape === "none") return chosen;
+  return ECC_ORDER.indexOf(chosen) >= ECC_ORDER.indexOf("Q") ? chosen : "Q";
+}
 
 export const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -65,6 +104,14 @@ export function isDotShape(value: unknown): value is DotShape {
   return DOT_SHAPES.includes(value as DotShape);
 }
 
+export function isFrameShape(value: unknown): value is FrameShape {
+  return FRAME_SHAPES.includes(value as FrameShape);
+}
+
+export function isFrameColorMode(value: unknown): value is FrameColorMode {
+  return value === "match" || value === "tint" || value === "custom";
+}
+
 export function isCornerStyle(value: unknown): value is CornerStyle {
   return CORNER_STYLES.includes(value as CornerStyle);
 }
@@ -72,7 +119,7 @@ export function isCornerStyle(value: unknown): value is CornerStyle {
 /**
  * Settings from a stored `qr-zone:v1` document. Missing, invalid or
  * unreadable fields fall back to the defaults, so data saved before a field
- * existed (e.g. without dot shape or corner style) still loads.
+ * existed (e.g. without dot shape, corner style or frame) still loads.
  */
 export function parseSettings(raw: string | null | undefined): Settings {
   const settings = { ...DEFAULT_SETTINGS };
@@ -99,6 +146,9 @@ export function parseSettings(raw: string | null | undefined): Settings {
   }
   if (isDotShape(saved.dotShape)) settings.dotShape = saved.dotShape;
   if (isCornerStyle(saved.cornerStyle)) settings.cornerStyle = saved.cornerStyle;
+  if (isFrameShape(saved.frameShape)) settings.frameShape = saved.frameShape;
+  if (isFrameColorMode(saved.frameColorMode)) settings.frameColorMode = saved.frameColorMode;
+  if (isHex(saved.frameColor)) settings.frameColor = saved.frameColor.toLowerCase();
   return settings;
 }
 

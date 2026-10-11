@@ -4,7 +4,7 @@
 
 CI badge: green = tests and both builds pass (typecheck, lint, `npm test`, `npm run build` and `npm run build:pages` on Node 22).
 
-A QR code generator. Type a URL or any text and the code redraws immediately. Set foreground and background colors, dot shape, corner style, module size, and error correction, then download a PNG.
+A QR code generator. Type a URL or any text and the code redraws immediately. Set foreground and background colors, dot shape, corner style, frame shape, module size, and error correction, then download a PNG.
 
 **Live:** https://el-jeffe81.github.io/QR-Zone/
 
@@ -16,14 +16,25 @@ Everything runs in the browser: the `qrcode` library encodes the text, the app d
 | --- | --- | --- |
 | Dot shape | **Square** (default), Rounded, Dots | The small data modules. Rounded softens outer corners and joins neighboring modules into smooth runs; Dots draws each module as a separate circle. Timing and alignment marks stay square so scanners can still lock on. |
 | Corner style | **Square** (default), Rounded, Circle | The three large finder patterns (the "eyes" in the corners). |
+| Frame shape | **None** (default), Circle, Rounded square, Diamond, Triangle, Hexagon, Star, Heart | Cuts the whole image to a shape. The real code stays square in the middle; the rest of the shape is filled with decorative dots. |
+| Frame color | **Match code** (default), Lighter tint, Custom | Color of the decorative dots. Lighter tint mixes the code color 55% toward the background, so the decoration reads softer than the code. Shown only while a frame is on. |
 
 The downloaded PNG is exactly what the preview shows. Every combination is covered by a test that decodes the rendered image back to the input text.
 
+### How frames work
+
+- The QR code itself is never reshaped. It sits inside the shape with a clear gap of 2 modules on every side, and no decoration is drawn in that gap, so scanners still see the code's edges.
+- Decorative dots use the current dot shape and fill the rest of the shape. Their pattern comes from a fixed seed made from the text and settings, so the same input always gives the same image, and a different text gives a different pattern.
+- Framed images are larger than plain ones (the shape has to fit around the code). Very large ones are capped at 4096 pixels per side by using a smaller module size; the app shows "reduced to fit" when that happens.
+- While a frame is on, error correction is at least **Quartile**. A lower choice is kept and comes back when the frame is set to None.
+
 ### Scanning tips
 
-- Keep high contrast: dark marks on a light background scan best. The app warns when contrast drops below 3:1 or the colors are inverted.
+- Keep high contrast. The app warns (without blocking) when code and background are below 4.5:1. Light-on-dark, like the Inverse preset, is fine as long as the contrast holds.
 - Use error correction **Medium or higher** with Rounded or Dots shapes. It gives scanners more room for the softer edges.
 - Keep the quiet zone (the plain border) when you place the code, and test-scan a printed copy at the size you will use.
+- With a frame, print a bit larger than a plain code would need: the code is only part of the image. Avoid cropping into the shape, and keep the decoration in Match code or Lighter tint unless your custom color is clearly different from the background.
+- Framed codes are tested at the smallest and largest module sizes, with a second decoder (ZXing), and after halving and slightly blurring the image.
 
 ## Requirements
 

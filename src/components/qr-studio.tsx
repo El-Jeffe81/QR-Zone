@@ -1,16 +1,21 @@
-import { useEffect, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { create, type ErrorCorrectionLevel } from "qrcode/lib/browser.js";
 import { Download, QrCode, TriangleAlert } from "lucide-react";
+import { contrastWarning, frameColorFor, type FrameColorMode } from "@/lib/qr/color";
+import type { FrameShape } from "@/lib/qr/frames";
 import { renderQr, type CornerStyle, type DotShape } from "@/lib/qr/render";
 import {
   CORNER_STYLE_OPTIONS,
   DEFAULT_SETTINGS,
   DOT_SHAPE_OPTIONS,
+  FRAME_COLOR_OPTIONS,
+  FRAME_SHAPE_OPTIONS,
   HEX,
   MODULE_MAX,
   MODULE_MIN,
   STORAGE_KEY,
   SWATCHES,
+  effectiveEcc,
   migrateLegacySettings,
   parseSettings,
   serializeSettings,
@@ -31,35 +36,21 @@ type Meta = {
   px: number;
   version: number;
   modules: number;
+  /** Pixels per module actually drawn; below the slider value for very large frames. */
+  modulePx: number;
 };
 
-function channel(hex: string, index: number) {
-  const value = Number.parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16) / 255;
-  return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-}
-
-function luminance(hex: string) {
-  return 0.2126 * channel(hex, 0) + 0.7152 * channel(hex, 1) + 0.0722 * channel(hex, 2);
-}
-
-function contrastRatio(foreground: string, background: string) {
-  const a = luminance(foreground);
-  const b = luminance(background);
-  const [hi, lo] = a > b ? [a, b] : [b, a];
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-function scanNote(foreground: string, background: string) {
-  const ratio = contrastRatio(foreground, background);
-  const inverted = luminance(foreground) > luminance(background);
-  if (ratio < 3) {
-    return `Contrast is ${ratio.toFixed(1)}:1. Darker marks on a lighter field scan more reliably.`;
-  }
-  if (inverted) {
-    return "Light marks on a dark field. Dark-on-light is more reliable on phone cameras.";
-  }
-  return null;
-}
+type PaintOptions = {
+  text: string;
+  ecc: Ecc;
+  foreground: string;
+  background: string;
+  modulePx: number;
+  dotShape: DotShape;
+  cornerStyle: CornerStyle;
+  frameShape: FrameShape;
+  frameColor: string;
+};
 
 function friendlyError(error: unknown) {
   const message = error instanceof Error ? error.message : "Could not build this code.";
@@ -69,34 +60,24 @@ function friendlyError(error: unknown) {
   return message;
 }
 
-function paint(
-  canvas: HTMLCanvasElement,
-  text: string,
-  ecc: Ecc,
-  foreground: string,
-  background: string,
-  modulePx: number,
-  dotShape: DotShape,
-  cornerStyle: CornerStyle,
-): Meta {
+function paint(canvas: HTMLCanvasElement, options: PaintOptions): Meta {
+  const { text, ecc, ...style } = options;
   const symbol = create(text, { errorCorrectionLevel: ecc });
   const modules = symbol.modules.size;
   // The PNG is these exact pixels: the preview <img> and the download both
-  // come from this canvas.
+  // come from this canvas. The seed (text plus every visual setting) makes
+  // the decorative frame pattern repeatable.
   const image = renderQr(symbol.modules, {
-    modulePx,
+    ...style,
     quietModules: QUIET_MODULES,
-    foreground,
-    background,
-    dotShape,
-    cornerStyle,
+    seed: JSON.stringify(options),
   });
   canvas.width = image.width;
   canvas.height = image.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Could not draw the code.");
   ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
-  return { px: image.width, version: symbol.version, modules };
+  return { px: image.width, version: symbol.version, modules, modulePx: image.modulePx };
 }
 
 function fileName(text: string) {
@@ -175,19 +156,23 @@ function OptionGroup<T extends string>({
   options,
   value,
   onChange,
+  columns = "grid-cols-3",
+  children,
 }: {
   legend: string;
   hint: string;
   name: string;
-  options: readonly { id: T; name: string; note: string }[];
+  options: readonly { id: T; name: string; note?: string }[];
   value: T;
   onChange: (next: T) => void;
+  columns?: string;
+  children?: ReactNode;
 }) {
   return (
     <fieldset>
       <legend className="text-sm font-medium">{legend}</legend>
       <p className="mt-1 text-sm text-muted">{hint}</p>
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className={`mt-3 grid gap-2 ${columns}`}>
         {options.map((option) => {
           const selected = value === option.id;
           return (
@@ -207,11 +192,12 @@ function OptionGroup<T extends string>({
                 className="sr-only"
               />
               <span className="text-sm font-medium">{option.name}</span>
-              <span className="text-sm text-muted">{option.note}</span>
+              {option.note && <span className="text-sm text-muted">{option.note}</span>}
             </label>
           );
         })}
       </div>
+      {children}
     </fieldset>
   );
 }
@@ -223,6 +209,7 @@ export function QrStudio() {
   const bgId = `${baseId}-bg`;
   const sizeId = `${baseId}-size`;
   const hintId = `${baseId}-hint`;
+  const frameColorId = `${baseId}-frame-color`;
 
   const [content, setContent] = useState(DEFAULT_SETTINGS.content);
   const [fg, setFg] = useState(DEFAULT_SETTINGS.fg);
@@ -231,6 +218,11 @@ export function QrStudio() {
   const [moduleSize, setModuleSize] = useState(DEFAULT_SETTINGS.moduleSize);
   const [dotShape, setDotShape] = useState<DotShape>(DEFAULT_SETTINGS.dotShape);
   const [cornerStyle, setCornerStyle] = useState<CornerStyle>(DEFAULT_SETTINGS.cornerStyle);
+  const [frameShape, setFrameShape] = useState<FrameShape>(DEFAULT_SETTINGS.frameShape);
+  const [frameColorMode, setFrameColorMode] = useState<FrameColorMode>(
+    DEFAULT_SETTINGS.frameColorMode,
+  );
+  const [frameColor, setFrameColor] = useState(DEFAULT_SETTINGS.frameColor);
   const [hydrated, setHydrated] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -257,6 +249,9 @@ export function QrStudio() {
     setModuleSize(saved.moduleSize);
     setDotShape(saved.dotShape);
     setCornerStyle(saved.cornerStyle);
+    setFrameShape(saved.frameShape);
+    setFrameColorMode(saved.frameColorMode);
+    setFrameColor(saved.frameColor);
     setHydrated(true);
   }, []);
 
@@ -265,12 +260,38 @@ export function QrStudio() {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        serializeSettings({ content, fg, bg, ecc, moduleSize, dotShape, cornerStyle }),
+        serializeSettings({
+          content,
+          fg,
+          bg,
+          ecc,
+          moduleSize,
+          dotShape,
+          cornerStyle,
+          frameShape,
+          frameColorMode,
+          frameColor,
+        }),
       );
     } catch {
       /* storage full or unavailable: settings just won't persist */
     }
-  }, [hydrated, content, fg, bg, ecc, moduleSize, dotShape, cornerStyle]);
+  }, [
+    hydrated,
+    content,
+    fg,
+    bg,
+    ecc,
+    moduleSize,
+    dotShape,
+    cornerStyle,
+    frameShape,
+    frameColorMode,
+    frameColor,
+  ]);
+
+  const usedEcc = effectiveEcc(ecc, frameShape);
+  const resolvedFrameColor = frameColorFor(frameColorMode, fg, bg, frameColor);
 
   useEffect(() => {
     if (content.trim() === "") {
@@ -281,7 +302,17 @@ export function QrStudio() {
     }
     try {
       const canvas = document.createElement("canvas");
-      const next = paint(canvas, content, ecc, fg, bg, moduleSize, dotShape, cornerStyle);
+      const next = paint(canvas, {
+        text: content,
+        ecc: usedEcc,
+        foreground: fg,
+        background: bg,
+        modulePx: moduleSize,
+        dotShape,
+        cornerStyle,
+        frameShape,
+        frameColor: resolvedFrameColor,
+      });
       setImageUrl(canvas.toDataURL("image/png"));
       setMeta(next);
       setError(null);
@@ -290,9 +321,9 @@ export function QrStudio() {
       setMeta(null);
       setError(friendlyError(err));
     }
-  }, [content, ecc, fg, bg, moduleSize, dotShape, cornerStyle]);
+  }, [content, usedEcc, fg, bg, moduleSize, dotShape, cornerStyle, frameShape, resolvedFrameColor]);
 
-  const warning = imageUrl ? scanNote(fg, bg) : null;
+  const warning = imageUrl ? contrastWarning(fg, bg) : null;
   const statusText = error
     ? error
     : warning
@@ -462,13 +493,47 @@ export function QrStudio() {
             onChange={setCornerStyle}
           />
 
+          <OptionGroup
+            legend="Frame shape"
+            hint="Cuts the image to a shape and fills it with decorative dots. The code itself stays square in the middle."
+            name="frame-shape"
+            options={FRAME_SHAPE_OPTIONS}
+            value={frameShape}
+            onChange={setFrameShape}
+            columns="grid-cols-2 sm:grid-cols-4"
+          />
+
+          {frameShape !== "none" && (
+            <OptionGroup
+              legend="Frame color"
+              hint="Color of the decorative dots around the code."
+              name="frame-color"
+              options={FRAME_COLOR_OPTIONS}
+              value={frameColorMode}
+              onChange={setFrameColorMode}
+            >
+              {frameColorMode === "custom" && (
+                <div className="mt-3 max-w-xs">
+                  <ColorField
+                    id={frameColorId}
+                    label="Frame color"
+                    value={frameColor}
+                    onChange={setFrameColor}
+                  />
+                </div>
+              )}
+            </OptionGroup>
+          )}
+
           <div className="flex flex-col gap-2">
             <div className="flex items-baseline justify-between gap-3">
               <label htmlFor={sizeId} className="text-sm font-medium">
                 Module size
               </label>
               <output htmlFor={sizeId} className="text-sm text-muted tabular-nums">
-                {moduleSize} px
+                {meta && meta.modulePx < moduleSize
+                  ? `${meta.modulePx} px (reduced to fit)`
+                  : `${moduleSize} px`}
                 {meta ? ` · ${meta.px}×${meta.px}` : ""}
               </output>
             </div>
@@ -494,6 +559,12 @@ export function QrStudio() {
             <p className="mt-1 text-sm text-muted">
               Higher levels survive scratches and logos, and fit less text.
             </p>
+            {usedEcc !== ecc && (
+              <p className="mt-1 text-sm text-warn">
+                Frames use at least Quartile, so Quartile is used while a frame is on. Your choice
+                returns when the frame is None.
+              </p>
+            )}
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {LEVELS.map((level) => {
                 const selected = ecc === level.id;
