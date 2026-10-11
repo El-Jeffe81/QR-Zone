@@ -47,9 +47,32 @@ describe("framed codes decode (jsqr)", () => {
   }
 });
 
+describe("solid frames decode (jsqr)", () => {
+  for (const frameShape of FRAME_SHAPES.filter((shape) => shape !== "none")) {
+    it(`${frameShape}: solid fill in match and tint colors, smallest and largest size`, () => {
+      for (const modulePx of [MODULE_MIN, MODULE_MAX]) {
+        for (const [mode, frameColor] of [
+          ["match", INK.foreground],
+          ["tint", TINT],
+        ]) {
+          const { image } = renderText(TEXT, {
+            frameShape,
+            frameFill: "solid",
+            frameColor,
+            modulePx,
+            dotShape: "rounded",
+            cornerStyle: "rounded",
+          });
+          assert.equal(decodeJsqr(image), TEXT, `${modulePx}px, ${mode}`);
+        }
+      }
+    });
+  }
+});
+
 describe("framed codes decode (ZXing)", () => {
   for (const frameShape of FRAME_SHAPES) {
-    it(`${frameShape}: dots with circle corners at 6 px`, () => {
+    it(`${frameShape}: dots with circle corners at 6 px, dot and solid fill`, () => {
       const { image } = renderText(TEXT, {
         frameShape,
         dotShape: "dots",
@@ -57,6 +80,15 @@ describe("framed codes decode (ZXing)", () => {
         modulePx: 6,
       });
       assert.equal(decodeZxing(image), TEXT);
+      if (frameShape === "none") return;
+      const solid = renderText(TEXT, {
+        frameShape,
+        frameFill: "solid",
+        dotShape: "dots",
+        cornerStyle: "circle",
+        modulePx: 6,
+      }).image;
+      assert.equal(decodeZxing(solid), TEXT, "solid fill");
     });
   }
 });
@@ -73,6 +105,15 @@ describe("framed codes survive a soft, half-size copy", () => {
       const soft = blur(downscaleHalf(image));
       assert.equal(soft.width, Math.floor(image.width / 2));
       assert.equal(decodeJsqr(soft), TEXT);
+      if (frameShape === "none") return;
+      const solid = renderText(TEXT, {
+        frameShape,
+        frameFill: "solid",
+        dotShape: "rounded",
+        cornerStyle: "rounded",
+        modulePx: 8,
+      }).image;
+      assert.equal(decodeJsqr(blur(downscaleHalf(solid))), TEXT, "solid fill");
     });
   }
 });
