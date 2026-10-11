@@ -6,12 +6,23 @@
  * user sees. No DOM or canvas APIs here.
  */
 
-import { decorCells, frameLayout, type FrameShape } from "./frames.ts";
+import {
+  FRAME_GAP,
+  decorCells,
+  frameLayout,
+  insideLayout,
+  type FrameLayout,
+  type FrameShape,
+} from "./frames.ts";
 
 export type DotShape = "square" | "rounded" | "dots";
 export type CornerStyle = "square" | "rounded" | "circle";
 
 export const DOT_SHAPES: readonly DotShape[] = ["square", "rounded", "dots"];
+
+/** How the frame is filled: a dot pattern (default) or one solid color. */
+export type FrameFill = "dots" | "solid";
+export const FRAME_FILLS: readonly FrameFill[] = ["dots", "solid"];
 export const CORNER_STYLES: readonly CornerStyle[] = ["square", "rounded", "circle"];
 
 /** The part of a `qrcode` symbol the renderer needs. */
@@ -38,6 +49,12 @@ export interface RenderOptions {
   frameShape?: FrameShape;
   /** #rrggbb for the decorative dots; defaults to `foreground`. */
   frameColor?: string;
+  /**
+   * "dots" (default) fills the frame with a seeded dot pattern; "solid"
+   * fills the whole shape with `frameColor`, leaving a clean window of the
+   * code plus FRAME_GAP modules around it.
+   */
+  frameFill?: FrameFill;
   /**
    * Seeds the decorative dot pattern, so the same text and settings always
    * give the same image. Callers pass the text plus their settings.
@@ -166,18 +183,67 @@ function coverageTile(
   return tile;
 }
 
+/** Points per module axis used to classify a module as fully in or out. */
+const CLASSIFY = 5;
+
+/**
+ * Coverage tiles for a solid frame: every module of the canvas outside the
+ * code's window (code plus FRAME_GAP), as [row, col, tile]. Modules fully
+ * inside the shape are solid; modules on its edge are anti-aliased.
+ */
+function solidFrameTiles(
+  size: number,
+  shape: FrameShape,
+  layout: FrameLayout,
+  modulePx: number,
+): [number, number, Float32Array][] {
+  const out: [number, number, Float32Array][] = [];
+  const full = new Float32Array(modulePx * modulePx).fill(1);
+  const top = layout.qrRow - FRAME_GAP;
+  const left = layout.qrCol - FRAME_GAP;
+  const end = size + FRAME_GAP * 2;
+  for (let row = 0; row < layout.rows; row += 1) {
+    for (let col = 0; col < layout.cols; col += 1) {
+      if (row >= top && row < top + end && col >= left && col < left + end) continue;
+      let hits = 0;
+      for (let j = 0; j < CLASSIFY; j += 1) {
+        for (let i = 0; i < CLASSIFY; i += 1) {
+          const x = col + i / (CLASSIFY - 1);
+          const y = row + j / (CLASSIFY - 1);
+          if (insideLayout(shape, layout, x, y)) hits += 1;
+        }
+      }
+      if (hits === 0) continue;
+      if (hits === CLASSIFY * CLASSIFY) {
+        out.push([row, col, full]);
+        continue;
+      }
+      out.push([
+        row,
+        col,
+        coverageTile(modulePx, 1, (u, v) => insideLayout(shape, layout, col + u, row + v)),
+      ]);
+    }
+  }
+  return out;
+}
+
 /** Render `matrix` to RGBA pixels with the chosen shapes, colors and frame. */
 export function renderQr(matrix: ModuleMatrix, options: RenderOptions): RenderedQr {
   const { quietModules, dotShape, cornerStyle } = options;
   const frameShape = options.frameShape ?? "none";
   const size = matrix.size;
   const layout = frameLayout(size, frameShape, quietModules);
-  const modulePx = Math.max(1, Math.min(options.modulePx, Math.floor(MAX_SIDE_PX / layout.side)));
-  const width = layout.side * modulePx;
+  const modulePx = Math.max(
+    1,
+    Math.min(options.modulePx, Math.floor(MAX_SIDE_PX / Math.max(layout.cols, layout.rows))),
+  );
+  const width = layout.cols * modulePx;
+  const height = layout.rows * modulePx;
   const fg = hexToRgb(options.foreground);
   const bg = hexToRgb(options.background);
   const frame = hexToRgb(options.frameColor ?? options.foreground);
-  const data = new Uint8ClampedArray(width * width * 4);
+  const data = new Uint8ClampedArray(width * height * 4);
 
   const isDark = (row: number, col: number) =>
     row >= 0 && col >= 0 && row < size && col < size && Boolean(matrix.get(row, col));
@@ -251,20 +317,25 @@ export function renderQr(matrix: ModuleMatrix, options: RenderOptions): Rendered
     stamp(qrRow + row, qrCol + col, finder, FINDER * modulePx, fg);
   }
 
-  // Decorative dots filling the rest of the frame, in the current dot shape.
-  if (frameShape !== "none") {
-    const side = layout.side;
+  if (frameShape !== "none" && options.frameFill === "solid") {
+    // The whole shape in the frame color, minus the code's window.
+    for (const [row, col, tile] of solidFrameTiles(size, frameShape, layout, modulePx)) {
+      stamp(row, col, tile, modulePx, frame);
+    }
+  } else if (frameShape !== "none") {
+    // Decorative dots filling the rest of the frame, in the current dot shape.
+    const { cols, rows } = layout;
     const cells = decorCells(size, frameShape, layout, options.seed ?? "");
     const isDecor = (row: number, col: number) =>
-      row >= 0 && col >= 0 && row < side && col < side && cells[row * side + col] === 1;
-    for (let row = 0; row < side; row += 1) {
-      for (let col = 0; col < side; col += 1) {
-        if (cells[row * side + col] === 1) {
+      row >= 0 && col >= 0 && row < rows && col < cols && cells[row * cols + col] === 1;
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        if (cells[row * cols + col] === 1) {
           stamp(row, col, moduleTile(isDecor, row, col), modulePx, frame);
         }
       }
     }
   }
 
-  return { width, height: width, modulePx, qrRow, qrCol, data };
+  return { width, height, modulePx, qrRow, qrCol, data };
 }
