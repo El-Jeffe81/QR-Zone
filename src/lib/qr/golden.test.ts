@@ -1,5 +1,6 @@
 /**
- * Golden hashes: SHA-256 of fixed, seeded renders, one per frame shape.
+ * Golden hashes: SHA-256 of fixed, seeded renders, one per frame shape with
+ * the dot fill, plus one per framed shape with the solid fill.
  * Any change to the pixels (renderer, frame layout, PRNG, or the qrcode
  * encoder) fails this test, so visual changes are always deliberate.
  *
@@ -22,7 +23,7 @@ const FILE = new URL("./golden-hashes.json", import.meta.url);
 const TEXT = "https://el-jeffe81.github.io/QR-Zone/";
 
 /** One fixed render per frame shape, cycling dot shapes, corners and colors. */
-const CASES = FRAME_SHAPES.map((frameShape, index) => {
+const DOT_CASES = FRAME_SHAPES.map((frameShape, index) => {
   const tint = index % 2 === 1;
   return {
     name: frameShape,
@@ -38,6 +39,14 @@ const CASES = FRAME_SHAPES.map((frameShape, index) => {
     },
   };
 });
+
+/** The same renders with a solid frame, keyed "solid:<shape>". */
+const SOLID_CASES = DOT_CASES.filter(({ name }) => name !== "none").map(({ name, options }) => ({
+  name: `solid:${name}`,
+  options: { ...options, frameFill: "solid" as const },
+}));
+
+const CASES = [...DOT_CASES, ...SOLID_CASES];
 
 function hashRender(options: (typeof CASES)[number]["options"]) {
   const { image } = renderText(TEXT, options);
@@ -58,8 +67,12 @@ if (process.env.UPDATE_GOLDEN === "1") {
 describe("golden renders", () => {
   const expected = JSON.parse(readFileSync(FILE, "utf8")) as Record<string, string>;
 
-  it("covers every frame shape exactly once", () => {
-    assert.deepEqual(Object.keys(expected).sort(), [...FRAME_SHAPES].sort());
+  it("covers every frame shape once per fill", () => {
+    const names = [
+      ...FRAME_SHAPES,
+      ...FRAME_SHAPES.filter((shape) => shape !== "none").map((shape) => `solid:${shape}`),
+    ];
+    assert.deepEqual(Object.keys(expected).sort(), names.sort());
   });
 
   for (const { name } of CASES) {
