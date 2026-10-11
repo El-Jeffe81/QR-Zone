@@ -69,11 +69,8 @@ describe("static Pages build smoke test", () => {
     await input.fill("");
     await input.pressSequentially(TEXT);
 
-    await page
-      .locator("fieldset", { hasText: "Frame shape" })
-      .locator("label")
-      .filter({ hasText: /^Heart$/ })
-      .click();
+    const frames = page.getByRole("radiogroup", { name: "Frame shape" });
+    await frames.getByRole("radio", { name: "Heart", exact: true }).check();
     await page.getByText("Frames use at least Quartile").waitFor();
 
     const preview = page.locator('img[src^="data:image/png"]');
