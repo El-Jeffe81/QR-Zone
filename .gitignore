@@ -2,7 +2,6 @@ node_modules
 /.vercel
 /screenshots
 /artifacts
-/.studio/app-env.json
 /.studio/*.log
 /.studio/*.pid
 /.studio/og-pending
