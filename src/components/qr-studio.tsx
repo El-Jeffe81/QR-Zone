@@ -1,13 +1,21 @@
 import { useEffect, useId, useState } from "react";
 import { create, type ErrorCorrectionLevel } from "qrcode/lib/browser.js";
 import { Download, QrCode, TriangleAlert } from "lucide-react";
+import { renderQr, type CornerStyle, type DotShape } from "@/lib/qr/render";
+import {
+  CORNER_STYLE_OPTIONS,
+  DEFAULT_SETTINGS,
+  DOT_SHAPE_OPTIONS,
+  HEX,
+  MODULE_MAX,
+  MODULE_MIN,
+  STORAGE_KEY,
+  SWATCHES,
+  parseSettings,
+  serializeSettings,
+} from "@/lib/qr/settings";
 
-const STORAGE_KEY = "quiet-zone:v1";
 const QUIET_MODULES = 4;
-const MODULE_MIN = 4;
-const MODULE_MAX = 16;
-const DEFAULT_FG = "#1b1916";
-const DEFAULT_BG = "#f6f3ed";
 
 const LEVELS: { id: ErrorCorrectionLevel; name: string; recovery: string }[] = [
   { id: "L", name: "Low", recovery: "7%" },
@@ -16,37 +24,13 @@ const LEVELS: { id: ErrorCorrectionLevel; name: string; recovery: string }[] = [
   { id: "H", name: "High", recovery: "30%" },
 ];
 
-const SWATCHES: { name: string; fg: string; bg: string }[] = [
-  { name: "Ink", fg: "#1b1916", bg: "#f6f3ed" },
-  { name: "Inverse", fg: "#f6f3ed", bg: "#1b1916" },
-  { name: "Signal", fg: "#8e3e1c", bg: "#f6f3ed" },
-];
-
 type Ecc = ErrorCorrectionLevel;
-
-type Saved = {
-  content?: unknown;
-  fg?: unknown;
-  bg?: unknown;
-  ecc?: unknown;
-  moduleSize?: unknown;
-};
 
 type Meta = {
   px: number;
   version: number;
   modules: number;
 };
-
-const HEX = /^#[0-9a-fA-F]{6}$/;
-
-function isEcc(value: unknown): value is Ecc {
-  return value === "L" || value === "M" || value === "Q" || value === "H";
-}
-
-function isHex(value: unknown): value is string {
-  return typeof value === "string" && HEX.test(value);
-}
 
 function channel(hex: string, index: number) {
   const value = Number.parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16) / 255;
@@ -91,27 +75,27 @@ function paint(
   foreground: string,
   background: string,
   modulePx: number,
+  dotShape: DotShape,
+  cornerStyle: CornerStyle,
 ): Meta {
   const symbol = create(text, { errorCorrectionLevel: ecc });
   const modules = symbol.modules.size;
-  const span = modules + QUIET_MODULES * 2;
-  const px = modulePx * span;
-  canvas.width = px;
-  canvas.height = px;
+  // The PNG is these exact pixels: the preview <img> and the download both
+  // come from this canvas.
+  const image = renderQr(symbol.modules, {
+    modulePx,
+    quietModules: QUIET_MODULES,
+    foreground,
+    background,
+    dotShape,
+    cornerStyle,
+  });
+  canvas.width = image.width;
+  canvas.height = image.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Could not draw the code.");
-  ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = background;
-  ctx.fillRect(0, 0, px, px);
-  ctx.fillStyle = foreground;
-  for (let row = 0; row < modules; row += 1) {
-    for (let col = 0; col < modules; col += 1) {
-      if (symbol.modules.get(row, col)) {
-        ctx.fillRect((col + QUIET_MODULES) * modulePx, (row + QUIET_MODULES) * modulePx, modulePx, modulePx);
-      }
-    }
-  }
-  return { px, version: symbol.version, modules };
+  ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
+  return { px: image.width, version: symbol.version, modules };
 }
 
 function fileName(text: string) {
@@ -183,6 +167,54 @@ function ColorField({
   );
 }
 
+function OptionGroup<T extends string>({
+  legend,
+  hint,
+  name,
+  options,
+  value,
+  onChange,
+}: {
+  legend: string;
+  hint: string;
+  name: string;
+  options: readonly { id: T; name: string; note: string }[];
+  value: T;
+  onChange: (next: T) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium">{legend}</legend>
+      <p className="mt-1 text-sm text-muted">{hint}</p>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {options.map((option) => {
+          const selected = value === option.id;
+          return (
+            <label
+              key={option.id}
+              className={`flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border px-3 py-2 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent ${
+                selected ? "border-accent bg-accent-soft" : "border-line bg-field"
+              }`}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={option.id}
+                checked={selected}
+                onChange={() => onChange(option.id)}
+                suppressHydrationWarning
+                className="sr-only"
+              />
+              <span className="text-sm font-medium">{option.name}</span>
+              <span className="text-sm text-muted">{option.note}</span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
 export function QrStudio() {
   const baseId = useId();
   const contentId = `${baseId}-content`;
@@ -191,43 +223,47 @@ export function QrStudio() {
   const sizeId = `${baseId}-size`;
   const hintId = `${baseId}-hint`;
 
-  const [content, setContent] = useState("");
-  const [fg, setFg] = useState(DEFAULT_FG);
-  const [bg, setBg] = useState(DEFAULT_BG);
-  const [ecc, setEcc] = useState<Ecc>("M");
-  const [moduleSize, setModuleSize] = useState(8);
+  const [content, setContent] = useState(DEFAULT_SETTINGS.content);
+  const [fg, setFg] = useState(DEFAULT_SETTINGS.fg);
+  const [bg, setBg] = useState(DEFAULT_SETTINGS.bg);
+  const [ecc, setEcc] = useState<Ecc>(DEFAULT_SETTINGS.ecc);
+  const [moduleSize, setModuleSize] = useState(DEFAULT_SETTINGS.moduleSize);
+  const [dotShape, setDotShape] = useState<DotShape>(DEFAULT_SETTINGS.dotShape);
+  const [cornerStyle, setCornerStyle] = useState<CornerStyle>(DEFAULT_SETTINGS.cornerStyle);
   const [hydrated, setHydrated] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let raw: string | null = null;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as Saved;
-        if (typeof saved.content === "string") setContent(saved.content);
-        if (isHex(saved.fg)) setFg(saved.fg.toLowerCase());
-        if (isHex(saved.bg)) setBg(saved.bg.toLowerCase());
-        if (isEcc(saved.ecc)) setEcc(saved.ecc);
-        if (
-          typeof saved.moduleSize === "number" &&
-          saved.moduleSize >= MODULE_MIN &&
-          saved.moduleSize <= MODULE_MAX
-        ) {
-          setModuleSize(saved.moduleSize);
-        }
-      }
+      raw = localStorage.getItem(STORAGE_KEY);
     } catch {
-      /* ignore unreadable settings */
+      /* storage unavailable: keep the defaults */
     }
+    const saved = parseSettings(raw);
+    setContent(saved.content);
+    setFg(saved.fg);
+    setBg(saved.bg);
+    setEcc(saved.ecc);
+    setModuleSize(saved.moduleSize);
+    setDotShape(saved.dotShape);
+    setCornerStyle(saved.cornerStyle);
     setHydrated(true);
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ content, fg, bg, ecc, moduleSize }));
-  }, [hydrated, content, fg, bg, ecc, moduleSize]);
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        serializeSettings({ content, fg, bg, ecc, moduleSize, dotShape, cornerStyle }),
+      );
+    } catch {
+      /* storage full or unavailable: settings just won't persist */
+    }
+  }, [hydrated, content, fg, bg, ecc, moduleSize, dotShape, cornerStyle]);
 
   useEffect(() => {
     if (content.trim() === "") {
@@ -238,7 +274,7 @@ export function QrStudio() {
     }
     try {
       const canvas = document.createElement("canvas");
-      const next = paint(canvas, content, ecc, fg, bg, moduleSize);
+      const next = paint(canvas, content, ecc, fg, bg, moduleSize, dotShape, cornerStyle);
       setImageUrl(canvas.toDataURL("image/png"));
       setMeta(next);
       setError(null);
@@ -247,7 +283,7 @@ export function QrStudio() {
       setMeta(null);
       setError(friendlyError(err));
     }
-  }, [content, ecc, fg, bg, moduleSize]);
+  }, [content, ecc, fg, bg, moduleSize, dotShape, cornerStyle]);
 
   const warning = imageUrl ? scanNote(fg, bg) : null;
   const statusText = error
@@ -400,6 +436,24 @@ export function QrStudio() {
               })}
             </div>
           </fieldset>
+
+          <OptionGroup
+            legend="Dot shape"
+            hint="Shape of the small modules that carry the data."
+            name="dot-shape"
+            options={DOT_SHAPE_OPTIONS}
+            value={dotShape}
+            onChange={setDotShape}
+          />
+
+          <OptionGroup
+            legend="Corner style"
+            hint="Shape of the three large squares scanners use to find the code."
+            name="corner-style"
+            options={CORNER_STYLE_OPTIONS}
+            value={cornerStyle}
+            onChange={setCornerStyle}
+          />
 
           <div className="flex flex-col gap-2">
             <div className="flex items-baseline justify-between gap-3">

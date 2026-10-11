@@ -1,10 +1,25 @@
 # Quiet Zone
 
-A QR code generator. Type a URL or any text and the code redraws immediately. Set foreground and background colors, module size, and error correction, then download a PNG.
+A QR code generator. Type a URL or any text and the code redraws immediately. Set foreground and background colors, dot shape, corner style, module size, and error correction, then download a PNG.
 
 **Live:** https://el-jeffe81.github.io/QR_Generator/
 
-Everything runs in the browser: codes are drawn with the `qrcode` library on a canvas, and your last settings are kept in `localStorage`. No account or server is needed.
+Everything runs in the browser: the `qrcode` library encodes the text, the app draws the modules onto a canvas itself, and your last settings (including the shape choices) are kept in `localStorage`. No account or server is needed.
+
+## Shape options
+
+| Option | Choices | What it changes |
+| --- | --- | --- |
+| Dot shape | **Square** (default), Rounded, Dots | The small data modules. Rounded softens outer corners and joins neighboring modules into smooth runs; Dots draws each module as a separate circle. Timing and alignment marks stay square so scanners can still lock on. |
+| Corner style | **Square** (default), Rounded, Circle | The three large finder patterns (the "eyes" in the corners). |
+
+The downloaded PNG is exactly what the preview shows. Every combination is covered by a test that decodes the rendered image back to the input text.
+
+### Scanning tips
+
+- Keep high contrast: dark marks on a light background scan best. The app warns when contrast drops below 3:1 or the colors are inverted.
+- Use error correction **Medium or higher** with Rounded or Dots shapes. It gives scanners more room for the softer edges.
+- Keep the quiet zone (the plain border) when you place the code, and test-scan a printed copy at the size you will use.
 
 ## Requirements
 
