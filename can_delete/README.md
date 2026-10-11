@@ -14,5 +14,6 @@ What is left:
   session (kept for reference; `.gitignore` re-includes these logs).
 
 Removed in October 2026: the old `QR_Generator.zip` project download (the
-current one is `public/QR-Zone.zip`), an old Vercel build output snapshot,
+current snapshot is `archive/QR-Zone.zip`, kept in the repo but no longer
+published on the site), an old Vercel build output snapshot,
 and a leftover copy of an unused install-page logo (`public/__studio/...`).
