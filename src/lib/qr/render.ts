@@ -6,6 +6,8 @@
  * user sees. No DOM or canvas APIs here.
  */
 
+import { decorCells, frameLayout, type FrameShape } from "./frames.ts";
+
 export type DotShape = "square" | "rounded" | "dots";
 export type CornerStyle = "square" | "rounded" | "circle";
 
@@ -32,11 +34,25 @@ export interface RenderOptions {
   background: string;
   dotShape: DotShape;
   cornerStyle: CornerStyle;
+  /** Outline the image is cut to; "none" (default) is the plain square code. */
+  frameShape?: FrameShape;
+  /** #rrggbb for the decorative dots; defaults to `foreground`. */
+  frameColor?: string;
+  /**
+   * Seeds the decorative dot pattern, so the same text and settings always
+   * give the same image. Callers pass the text plus their settings.
+   */
+  seed?: string;
 }
 
 export interface RenderedQr {
   width: number;
   height: number;
+  /** Pixels per module actually used (large frames are capped, see MAX_SIDE_PX). */
+  modulePx: number;
+  /** Top-left module of the QR symbol on the canvas (equals quietModules without a frame). */
+  qrRow: number;
+  qrCol: number;
   /** RGBA, row-major, `width * height * 4` bytes. */
   data: Uint8ClampedArray<ArrayBuffer>;
 }
@@ -47,6 +63,11 @@ const FINDER = 7;
 const DOT_RADIUS = 0.45;
 /** Sub-samples per pixel axis on curved edges (anti-aliasing). */
 const SUPERSAMPLE = 4;
+/**
+ * Largest image side, in pixels. Big frames around long texts would otherwise
+ * reach canvas limits, so the module size is reduced to fit.
+ */
+export const MAX_SIDE_PX = 4096;
 
 type Rgb = [number, number, number];
 
@@ -145,13 +166,17 @@ function coverageTile(
   return tile;
 }
 
-/** Render `matrix` to RGBA pixels with the chosen shapes and colors. */
+/** Render `matrix` to RGBA pixels with the chosen shapes, colors and frame. */
 export function renderQr(matrix: ModuleMatrix, options: RenderOptions): RenderedQr {
-  const { modulePx, quietModules, dotShape, cornerStyle } = options;
+  const { quietModules, dotShape, cornerStyle } = options;
+  const frameShape = options.frameShape ?? "none";
   const size = matrix.size;
-  const width = (size + quietModules * 2) * modulePx;
+  const layout = frameLayout(size, frameShape, quietModules);
+  const modulePx = Math.max(1, Math.min(options.modulePx, Math.floor(MAX_SIDE_PX / layout.side)));
+  const width = layout.side * modulePx;
   const fg = hexToRgb(options.foreground);
   const bg = hexToRgb(options.background);
+  const frame = hexToRgb(options.frameColor ?? options.foreground);
   const data = new Uint8ClampedArray(width * width * 4);
 
   const isDark = (row: number, col: number) =>
@@ -165,18 +190,21 @@ export function renderQr(matrix: ModuleMatrix, options: RenderOptions): Rendered
     data[i + 3] = 255;
   }
 
-  /** Blend `tile` (side × side coverage) onto the image at module (row, col). */
-  const stamp = (row: number, col: number, tile: Float32Array, side: number) => {
-    const left = (col + quietModules) * modulePx;
-    const top = (row + quietModules) * modulePx;
+  /**
+   * Blend `tile` (side × side coverage) in `color` onto the image with its
+   * top-left at canvas module (row, col).
+   */
+  const stamp = (row: number, col: number, tile: Float32Array, side: number, color: Rgb) => {
+    const left = col * modulePx;
+    const top = row * modulePx;
     for (let y = 0; y < side; y += 1) {
       for (let x = 0; x < side; x += 1) {
         const coverage = tile[y * side + x];
         if (coverage <= 0) continue;
         const i = ((top + y) * width + left + x) * 4;
-        data[i] = bg[0] + (fg[0] - bg[0]) * coverage;
-        data[i + 1] = bg[1] + (fg[1] - bg[1]) * coverage;
-        data[i + 2] = bg[2] + (fg[2] - bg[2]) * coverage;
+        data[i] = bg[0] + (color[0] - bg[0]) * coverage;
+        data[i + 1] = bg[1] + (color[1] - bg[1]) * coverage;
+        data[i + 2] = bg[2] + (color[2] - bg[2]) * coverage;
       }
     }
   };
@@ -184,12 +212,12 @@ export function renderQr(matrix: ModuleMatrix, options: RenderOptions): Rendered
   // A module's shape depends only on which of its four orthogonal neighbors
   // are dark, so each of the 16 combinations is rasterized at most once.
   const tiles = new Map<number, Float32Array>();
-  const moduleTile = (row: number, col: number) => {
+  const moduleTile = (dark: (row: number, col: number) => boolean, row: number, col: number) => {
     const key =
-      (isDark(row - 1, col) ? 1 : 0) |
-      (isDark(row + 1, col) ? 2 : 0) |
-      (isDark(row, col - 1) ? 4 : 0) |
-      (isDark(row, col + 1) ? 8 : 0);
+      (dark(row - 1, col) ? 1 : 0) |
+      (dark(row + 1, col) ? 2 : 0) |
+      (dark(row, col - 1) ? 4 : 0) |
+      (dark(row, col + 1) ? 8 : 0);
     let tile = tiles.get(key);
     if (!tile) {
       const neighbor = (dr: number, dc: number) =>
@@ -204,6 +232,7 @@ export function renderQr(matrix: ModuleMatrix, options: RenderOptions): Rendered
   };
 
   const solid = new Float32Array(modulePx * modulePx).fill(1);
+  const { qrRow, qrCol } = layout;
 
   // Data modules take the dot shape; timing, alignment, format and version
   // modules stay square.
@@ -211,13 +240,31 @@ export function renderQr(matrix: ModuleMatrix, options: RenderOptions): Rendered
     for (let col = 0; col < size; col += 1) {
       if (!isDark(row, col) || inFinder(size, row, col)) continue;
       const reserved = Boolean(matrix.isReserved?.(row, col));
-      stamp(row, col, reserved ? solid : moduleTile(row, col), modulePx);
+      const tile = reserved ? solid : moduleTile(isDark, row, col);
+      stamp(qrRow + row, qrCol + col, tile, modulePx, fg);
     }
   }
 
   // Finder patterns, drawn whole so their corners can be styled.
   const finder = coverageTile(modulePx, FINDER, (u, v) => finderDark(u, v, cornerStyle));
-  for (const [row, col] of finderOrigins(size)) stamp(row, col, finder, FINDER * modulePx);
+  for (const [row, col] of finderOrigins(size)) {
+    stamp(qrRow + row, qrCol + col, finder, FINDER * modulePx, fg);
+  }
 
-  return { width, height: width, data };
+  // Decorative dots filling the rest of the frame, in the current dot shape.
+  if (frameShape !== "none") {
+    const side = layout.side;
+    const cells = decorCells(size, frameShape, layout, options.seed ?? "");
+    const isDecor = (row: number, col: number) =>
+      row >= 0 && col >= 0 && row < side && col < side && cells[row * side + col] === 1;
+    for (let row = 0; row < side; row += 1) {
+      for (let col = 0; col < side; col += 1) {
+        if (cells[row * side + col] === 1) {
+          stamp(row, col, moduleTile(isDecor, row, col), modulePx, frame);
+        }
+      }
+    }
+  }
+
+  return { width, height: width, modulePx, qrRow, qrCol, data };
 }
