@@ -265,7 +265,7 @@ export function QrStudio() {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        serializeSettings({ content, fg, bg, ecc, moduleSize, dotShape, cornerStyle }),
+        serializeSettings({ ...DEFAULT_SETTINGS, content, fg, bg, ecc, moduleSize, dotShape, cornerStyle }),
       );
     } catch {
       /* storage full or unavailable: settings just won't persist */

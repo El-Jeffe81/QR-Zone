@@ -49,6 +49,9 @@ describe("parseSettings", () => {
       moduleSize: 12,
       dotShape: "square",
       cornerStyle: "square",
+      frameShape: "none",
+      frameColorMode: "match",
+      frameColor: DEFAULT_SETTINGS.frameColor,
     });
   });
 
