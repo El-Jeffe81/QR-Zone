@@ -1,10 +1,10 @@
-# Quiet Zone
+# QR Zone
 
 A QR code generator. Type a URL or any text and the code redraws immediately. Set foreground and background colors, dot shape, corner style, module size, and error correction, then download a PNG.
 
-**Live:** https://el-jeffe81.github.io/QR_Generator/
+**Live:** https://el-jeffe81.github.io/QR-Zone/
 
-Everything runs in the browser: the `qrcode` library encodes the text, the app draws the modules onto a canvas itself, and your last settings (including the shape choices) are kept in `localStorage`. No account or server is needed.
+Everything runs in the browser: the `qrcode` library encodes the text, the app draws the modules onto a canvas itself, and your last settings (including the shape choices) are kept in `localStorage` under `qr-zone:v1` (settings saved by older versions under `quiet-zone:v1` are carried over automatically). No account or server is needed.
 
 ## Shape options
 
@@ -44,16 +44,20 @@ Open the local preview, enter a link, and download the PNG.
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
 | `npm run build` | Default production build (Vercel/Nitro output in `.vercel/output`) |
-| `npm run build:pages` | Static build for GitHub Pages, served under `/QR_Generator/`, written to `dist/client` |
+| `npm run build:pages` | Static build for GitHub Pages, served under `/QR-Zone/`, written to `dist/client` |
 
 ## Deploy (GitHub Pages)
 
 `.github/workflows/pages.yml` runs `npm run build:pages` on every push to `main` (or manually from the Actions tab) and publishes `dist/client` to GitHub Pages. In the repository settings, Pages must use **GitHub Actions** as its source.
 
-To check a Pages build locally, serve `dist/client` under a `/QR_Generator/` path, for example:
+To check a Pages build locally, serve `dist/client` under a `/QR-Zone/` path, for example:
 
 ```bash
 npm run build:pages
-mkdir -p /tmp/pages && rm -rf /tmp/pages/QR_Generator && cp -r dist/client /tmp/pages/QR_Generator
-npx serve /tmp/pages   # or any static server; then open /QR_Generator/
+mkdir -p /tmp/pages && rm -rf /tmp/pages/QR-Zone && cp -r dist/client /tmp/pages/QR-Zone
+npx serve /tmp/pages   # or any static server; then open /QR-Zone/
 ```
+
+## History
+
+This project was called **Quiet Zone** and lived at `El-Jeffe81/QR_Generator`. GitHub redirects the old repository URL, but the old Pages address (`https://el-jeffe81.github.io/QR_Generator/`) no longer works; use https://el-jeffe81.github.io/QR-Zone/.
