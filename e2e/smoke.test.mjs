@@ -146,4 +146,34 @@ describe("static Pages build smoke test", () => {
 
     assert.deepEqual(problems, []);
   });
+
+  it("an added shape with solid fill: Castle + Solid decodes in preview and download", async () => {
+    const preview = page.getByRole("button", { name: "Open large preview" }).locator("img");
+    const before = await preview.getAttribute("src");
+    const frames = page.getByRole("radiogroup", { name: "Frame shape" });
+    await frames.getByRole("radio", { name: "Castle", exact: true }).check();
+    await page
+      .getByRole("radiogroup", { name: "Frame fill" })
+      .getByRole("radio", { name: "Solid", exact: true })
+      .check();
+    await page.waitForFunction(
+      (old) =>
+        document
+          .querySelector("button[aria-label='Open large preview'] img")
+          ?.getAttribute("src") !== old,
+      before,
+    );
+    const previewSrc = await preview.getAttribute("src");
+    assert.equal(decode(await pixelsOf(page, previewSrc)), TEXT, "Castle preview does not decode");
+
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Download PNG" }).click(),
+    ]);
+    const file = readFileSync(await download.path());
+    const downloaded = `data:image/png;base64,${file.toString("base64")}`;
+    assert.equal(decode(await pixelsOf(page, downloaded)), TEXT, "Castle download does not decode");
+    assert.equal(downloaded, previewSrc, "download differs from the preview");
+    assert.deepEqual(problems, []);
+  });
 });
