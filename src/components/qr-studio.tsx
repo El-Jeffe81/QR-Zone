@@ -311,7 +311,7 @@ export function QrStudio() {
           <QrCode className="size-6" />
         </span>
         <div className="min-w-0">
-          <h1 className="font-display text-3xl leading-tight font-medium text-balance sm:text-5xl">Quiet Zone</h1>
+          <h1 className="font-display text-3xl leading-tight font-medium text-balance sm:text-5xl">QR Zone</h1>
           <p className="mt-2 max-w-xl text-pretty text-muted">
             Type a URL or any text. The code redraws immediately — then save a PNG.
           </p>

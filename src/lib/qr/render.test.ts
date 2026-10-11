@@ -26,7 +26,7 @@ function decode(image: { data: Uint8ClampedArray; width: number; height: number 
 const SAMPLES: { text: string; ecc: "L" | "M" | "Q" | "H"; modulePx: number }[] = [
   { text: "https://el-jeffe81.github.io/QR_Generator/", ecc: "M", modulePx: 8 },
   { text: "Hello", ecc: "H", modulePx: 4 },
-  { text: "Quiet Zone · ünïcödé · 1234567890", ecc: "Q", modulePx: 16 },
+  { text: "QR Zone · ünïcödé · 1234567890", ecc: "Q", modulePx: 16 },
   { text: "x".repeat(300), ecc: "L", modulePx: 5 },
 ];
 
