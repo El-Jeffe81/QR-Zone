@@ -4,7 +4,7 @@
 
 CI badge: green = tests and both builds pass (typecheck, lint, `npm test`, `npm run build` and `npm run build:pages` on Node 22).
 
-A QR code generator. Type a URL or any text and the code redraws immediately. Set foreground and background colors, dot shape, corner style, frame shape, module size, and error correction, then download a PNG.
+A QR code generator. Type a URL or any text and the code redraws immediately. Set foreground and background colors, dot shape, corner style, frame shape, module size, and error correction, then download or share a PNG.
 
 **Live:** https://el-jeffe81.github.io/QR-Zone/
 
@@ -31,6 +31,19 @@ The downloaded PNG is exactly what the preview shows. Every combination is cover
 - Shape notes: the ticket's tear line is a cleared strip with notches on its ends and on the short sides; the moon is a fat crescent with the code in its thick lower-left part, so the code is a smaller share of the image than in other shapes; the gear has 10 teeth.
 - Framed images are larger than plain ones (the shape has to fit around the code). Very large ones are capped at 4096 pixels per side by using a smaller module size; the app shows "reduced to fit" when that happens.
 - While a frame is on, error correction is at least **Quartile**. A lower choice is kept and comes back when the frame is set to None.
+
+### Sharing
+
+**Share** sits next to Download PNG.
+
+- Where the browser can share files (most phones, some desktop browsers), it opens the system share sheet with the PNG (the same bytes and file name as the download) and the text or URL as the message.
+- Elsewhere it opens a menu:
+  - **Email** opens a new message (subject "QR code", the text as the body). Email links can't attach files, so download the PNG and attach it.
+  - **Text message** opens an `sms:` link with the text. On a computer this needs a texting app.
+  - **Copy image** copies the PNG, shown only where the clipboard accepts images.
+  - **Copy text** copies the text or URL.
+- The menu works with the keyboard (arrow keys, Home, End, Escape), and focus returns to Share when it closes. Copies are confirmed in a short status message.
+- Nothing goes through a server and nothing is tracked: the share sheet, mail and SMS apps, and the clipboard are all on your device.
 
 ### Scanning tips
 

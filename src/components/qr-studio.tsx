@@ -3,6 +3,8 @@ import { create, type ErrorCorrectionLevel } from "qrcode/lib/browser.js";
 import { Ban, Download, Maximize2, QrCode, TriangleAlert, X } from "lucide-react";
 import { contrastWarning, frameColorFor, type FrameColorMode } from "@/lib/qr/color";
 import { frameIcon } from "@/lib/qr/frame-icons";
+import { fileName } from "@/lib/qr/share";
+import { ShareButton } from "./share-button";
 import type { FrameShape } from "@/lib/qr/frames";
 import { renderQr, type CornerStyle, type DotShape, type FrameFill } from "@/lib/qr/render";
 import {
@@ -83,22 +85,6 @@ function paint(canvas: HTMLCanvasElement, options: PaintOptions): Meta {
   if (!ctx) throw new Error("Could not draw the code.");
   ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
   return { px: image.width, version: symbol.version, modules, modulePx: image.modulePx };
-}
-
-function fileName(text: string) {
-  const trimmed = text.trim();
-  try {
-    const host = new URL(trimmed).hostname.replace(/^www\./, "").replace(/[^a-z0-9.-]+/gi, "");
-    if (host) return `qr-${host}.png`;
-  } catch {
-    /* not a url */
-  }
-  const slug = trimmed
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 32);
-  return slug ? `qr-${slug}.png` : "qr-code.png";
 }
 
 function ColorField({
@@ -326,6 +312,17 @@ export function QrStudio() {
   const [frameFill, setFrameFill] = useState<FrameFill>(DEFAULT_SETTINGS.frameFill);
   const [hydrated, setHydrated] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  function notify(message: string) {
+    clearTimeout(toastTimer.current);
+    // Clear first so the same message twice is announced twice.
+    setToast("");
+    requestAnimationFrame(() => setToast(message));
+    toastTimer.current = setTimeout(() => setToast(""), 3000);
+  }
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
   /** The button that opened the large view, so focus can go back to it. */
   const expandTrigger = useRef<HTMLButtonElement | null>(null);
 
@@ -530,7 +527,7 @@ export function QrStudio() {
                 </span>
               )}
             </button>
-            <div className="mt-2 flex gap-2">
+            <div className="relative mt-2 flex gap-2">
               <button
                 type="button"
                 onClick={download}
@@ -540,6 +537,7 @@ export function QrStudio() {
                 <Download className="size-4" aria-hidden="true" />
                 Download PNG
               </button>
+              <ShareButton imageUrl={imageUrl} text={content} onNotify={notify} />
               <button
                 type="button"
                 onClick={(event) => openExpanded(event.currentTarget)}
@@ -767,6 +765,17 @@ export function QrStudio() {
           onClose={closeExpanded}
         />
       )}
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4"
+      >
+        {toast && (
+          <p className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface shadow-panel">
+            {toast}
+          </p>
+        )}
+      </div>
     </main>
   );
 }
