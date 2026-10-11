@@ -19,7 +19,6 @@ const LEVELS: { id: ErrorCorrectionLevel; name: string; recovery: string }[] = [
 const SWATCHES: { name: string; fg: string; bg: string }[] = [
   { name: "Ink", fg: "#1b1916", bg: "#f6f3ed" },
   { name: "Inverse", fg: "#f6f3ed", bg: "#1b1916" },
-  { name: "Signal", fg: "#8e3e1c", bg: "#f6f3ed" },
 ];
 
 type Ecc = ErrorCorrectionLevel;
