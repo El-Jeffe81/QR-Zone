@@ -6,7 +6,9 @@ import { CORNER_STYLES, DOT_SHAPES, type CornerStyle, type DotShape } from "./re
 
 export type Ecc = "L" | "M" | "Q" | "H";
 
-export const STORAGE_KEY = "quiet-zone:v1";
+export const STORAGE_KEY = "qr-zone:v1";
+/** Key used before the app was renamed from Quiet Zone to QR Zone. */
+export const LEGACY_STORAGE_KEY = "quiet-zone:v1";
 export const MODULE_MIN = 4;
 export const MODULE_MAX = 16;
 export const DEFAULT_FG = "#1b1916";
@@ -68,7 +70,7 @@ export function isCornerStyle(value: unknown): value is CornerStyle {
 }
 
 /**
- * Settings from a stored `quiet-zone:v1` document. Missing, invalid or
+ * Settings from a stored `qr-zone:v1` document. Missing, invalid or
  * unreadable fields fall back to the defaults, so data saved before a field
  * existed (e.g. without dot shape or corner style) still loads.
  */
@@ -98,6 +100,19 @@ export function parseSettings(raw: string | null | undefined): Settings {
   if (isDotShape(saved.dotShape)) settings.dotShape = saved.dotShape;
   if (isCornerStyle(saved.cornerStyle)) settings.cornerStyle = saved.cornerStyle;
   return settings;
+}
+
+/**
+ * One-time migration from the pre-rename key: when `qr-zone:v1` is absent,
+ * copy whatever `quiet-zone:v1` holds into it. The old key is left in place,
+ * and an existing new value is never overwritten. Returns whether it copied.
+ */
+export function migrateLegacySettings(storage: Pick<Storage, "getItem" | "setItem">): boolean {
+  if (storage.getItem(STORAGE_KEY) !== null) return false;
+  const legacy = storage.getItem(LEGACY_STORAGE_KEY);
+  if (legacy === null) return false;
+  storage.setItem(STORAGE_KEY, legacy);
+  return true;
 }
 
 export function serializeSettings(settings: Settings): string {

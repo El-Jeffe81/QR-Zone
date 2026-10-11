@@ -11,6 +11,7 @@ import {
   MODULE_MIN,
   STORAGE_KEY,
   SWATCHES,
+  migrateLegacySettings,
   parseSettings,
   serializeSettings,
 } from "@/lib/qr/settings";
@@ -237,6 +238,12 @@ export function QrStudio() {
 
   useEffect(() => {
     let raw: string | null = null;
+    try {
+      // Settings saved under the pre-rename key carry over once.
+      migrateLegacySettings(localStorage);
+    } catch {
+      /* storage full or unavailable: read whatever is there below */
+    }
     try {
       raw = localStorage.getItem(STORAGE_KEY);
     } catch {
