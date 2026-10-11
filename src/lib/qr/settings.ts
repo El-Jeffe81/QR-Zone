@@ -28,6 +28,33 @@ export const SWATCHES: readonly { name: string; fg: string; bg: string }[] = [
   { name: "Inverse", fg: DEFAULT_BG, bg: DEFAULT_FG },
 ];
 
+/**
+ * Error correction levels with the description shown under the buttons and
+ * used as each button's tooltip and accessible description.
+ */
+export const ECC_OPTIONS: readonly { id: Ecc; name: string; note: string }[] = [
+  {
+    id: "L",
+    name: "Low",
+    note: "Recovers about 7% damage. Simplest, biggest squares. Best viewed on a screen.",
+  },
+  {
+    id: "M",
+    name: "Medium",
+    note: "Recovers about 15%. A good balance for screens and standard printing.",
+  },
+  {
+    id: "Q",
+    name: "Quartile",
+    note: "Recovers about 25%. Used automatically with frames. Good for printed handouts.",
+  },
+  {
+    id: "H",
+    name: "High",
+    note: "Recovers about 30%. Densest code. Survives smudges, folds, weather, or partial covering.",
+  },
+];
+
 export const DOT_SHAPE_OPTIONS: readonly { id: DotShape; name: string; note: string }[] = [
   { id: "square", name: "Square", note: "Classic blocks" },
   { id: "rounded", name: "Rounded", note: "Soft, joined edges" },
