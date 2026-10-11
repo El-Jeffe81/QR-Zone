@@ -176,4 +176,147 @@ describe("static Pages build smoke test", () => {
     assert.equal(downloaded, previewSrc, "download differs from the preview");
     assert.deepEqual(problems, []);
   });
+
+  /** A fresh page with its own context, set up before the app's scripts run. */
+  async function freshPage(init, contextOptions = {}) {
+    const context = await browser.newContext({
+      acceptDownloads: true,
+      viewport: VIEWPORT,
+      ...contextOptions,
+    });
+    const fresh = await context.newPage();
+    const errors = [];
+    fresh.on("pageerror", (error) => errors.push(`page error: ${error.message}`));
+    fresh.on("console", (message) => {
+      if (message.type() === "error") errors.push(`console error: ${message.text()}`);
+    });
+    await fresh.addInitScript(init);
+    await fresh.goto(server.url, { waitUntil: "networkidle" });
+    return { fresh, context, errors };
+  }
+
+  it("Share opens the system share sheet with the PNG (same bytes and name as Download) and the text", async () => {
+    const { fresh, context, errors } = await freshPage(() => {
+      const define = (name, value) =>
+        Object.defineProperty(navigator, name, { value, configurable: true });
+      window.__canShareCalls = 0;
+      define("canShare", (data) => {
+        window.__canShareCalls += 1;
+        return Boolean(data?.files?.length);
+      });
+      define("share", async (data) => {
+        const files = [];
+        for (const file of data.files ?? []) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          let binary = "";
+          for (const byte of bytes) binary += String.fromCharCode(byte);
+          files.push({ name: file.name, type: file.type, base64: btoa(binary) });
+        }
+        window.__shared = { text: data.text, files };
+      });
+    });
+    const input = fresh.getByLabel("URL or text");
+    await input.fill(TEXT);
+    const preview = fresh.getByRole("button", { name: "Open large preview" }).locator("img");
+    await preview.waitFor();
+    const share = fresh.getByRole("button", { name: "Share", exact: true });
+    assert.equal(await share.getAttribute("aria-haspopup"), null, "sheet mode is not a menu");
+    await share.click();
+    await fresh.waitForFunction(() => window.__shared);
+    const shared = await fresh.evaluate(() => window.__shared);
+    assert.equal(shared.text, TEXT);
+    assert.equal(shared.files.length, 1);
+    assert.equal(shared.files[0].type, "image/png");
+
+    const [download] = await Promise.all([
+      fresh.waitForEvent("download"),
+      fresh.getByRole("button", { name: "Download PNG" }).click(),
+    ]);
+    assert.equal(shared.files[0].name, download.suggestedFilename());
+    const downloaded = readFileSync(await download.path()).toString("base64");
+    assert.equal(shared.files[0].base64, downloaded, "shared PNG differs from the download");
+    const previewSrc = await preview.getAttribute("src");
+    assert.equal(`data:image/png;base64,${shared.files[0].base64}`, previewSrc);
+    assert.equal(decode(await pixelsOf(fresh, previewSrc)), TEXT);
+    assert.equal(await fresh.getByRole("menu").count(), 0, "fallback menu opened too");
+    assert.deepEqual(errors, []);
+    await context.close();
+  });
+
+  it("without file sharing, Share opens an accessible menu with mail, text, and copy actions", async () => {
+    const SHARE_TEXT = "Café & co? #1 ☕ https://example.com/?a=1&b=2#top";
+    const { fresh, context, errors } = await freshPage(
+      () => {
+        for (const name of ["share", "canShare"]) {
+          Object.defineProperty(navigator, name, { value: undefined, configurable: true });
+        }
+      },
+      { permissions: ["clipboard-read", "clipboard-write"] },
+    );
+    const focusedName = () =>
+      fresh.evaluate(() => {
+        const active = document.activeElement;
+        return active?.getAttribute("aria-label") ?? active?.textContent?.trim() ?? null;
+      });
+    await fresh.getByLabel("URL or text").fill(SHARE_TEXT);
+    await fresh.getByRole("button", { name: "Open large preview" }).locator("img").waitFor();
+
+    const share = fresh.getByRole("button", { name: "Share", exact: true });
+    assert.equal(await share.getAttribute("aria-haspopup"), "menu");
+    assert.equal(await share.getAttribute("aria-expanded"), "false");
+    await share.click();
+    const menu = fresh.getByRole("menu", { name: "Share" });
+    await menu.waitFor();
+    assert.equal(await share.getAttribute("aria-expanded"), "true");
+    assert.equal(await focusedName(), "Email", "first item is focused on open");
+
+    const encoded = encodeURIComponent(SHARE_TEXT);
+    const email = menu.getByRole("menuitem", { name: "Email", exact: true });
+    const sms = menu.getByRole("menuitem", { name: "Text message", exact: true });
+    assert.equal(await email.getAttribute("href"), `mailto:?subject=QR%20code&body=${encoded}`);
+    assert.equal(await sms.getAttribute("href"), `sms:?&body=${encoded}`);
+    assert.match(await menu.textContent(), /can’t attach files/);
+    assert.match(await menu.textContent(), /needs a texting app/);
+
+    // Arrow keys move through the items; Escape closes and returns focus.
+    await fresh.keyboard.press("ArrowDown");
+    assert.equal(await focusedName(), "Text message");
+    await fresh.keyboard.press("End");
+    assert.equal(await focusedName(), "Copy text");
+    await fresh.keyboard.press("ArrowDown");
+    assert.equal(await focusedName(), "Email", "focus wraps around");
+    await fresh.keyboard.press("Escape");
+    await menu.waitFor({ state: "detached" });
+    assert.equal(await focusedName(), "Share");
+    assert.equal(await share.getAttribute("aria-expanded"), "false");
+
+    // Copy text: confirmation, and the clipboard holds the text.
+    await share.click();
+    await menu.getByRole("menuitem", { name: "Copy text" }).click();
+    await fresh.getByRole("status").filter({ hasText: "Text copied." }).waitFor();
+    assert.equal(await fresh.evaluate(() => navigator.clipboard.readText()), SHARE_TEXT);
+    assert.equal(await focusedName(), "Share");
+
+    // Copy image, where the clipboard takes PNGs (it does in Chromium).
+    await share.click();
+    const copyImage = menu.getByRole("menuitem", { name: "Copy image" });
+    if (await copyImage.count()) {
+      await copyImage.click();
+      await fresh.getByRole("status").filter({ hasText: "Image copied." }).waitFor();
+      const types = await fresh.evaluate(async () =>
+        (await navigator.clipboard.read()).flatMap((item) => item.types),
+      );
+      assert.ok(types.includes("image/png"), `clipboard has ${types}`);
+    } else {
+      await fresh.keyboard.press("Escape");
+    }
+
+    // A click outside closes the menu.
+    await share.click();
+    await menu.waitFor();
+    await fresh.getByLabel("URL or text").click();
+    await menu.waitFor({ state: "detached" });
+    assert.deepEqual(errors, []);
+    await context.close();
+  });
 });
