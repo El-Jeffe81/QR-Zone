@@ -280,7 +280,7 @@ export function QrStudio() {
             Type a URL or any text. The code redraws immediately — then save a PNG.
           </p>
           <a
-            href="/QR_Generator.zip"
+            href={`${import.meta.env.BASE_URL}QR_Generator.zip`}
             download="QR_Generator.zip"
             className="mt-4 inline-flex h-11 items-center rounded-lg bg-accent px-4 font-semibold text-field"
           >

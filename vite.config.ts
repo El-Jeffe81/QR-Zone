@@ -142,10 +142,28 @@ function authPopupPlugin(): Plugin {
   };
 }
 
+/**
+ * `STATIC_PAGES=1` builds a fully static copy for GitHub Pages, served from
+ * https://el-jeffe81.github.io/QR_Generator/: every URL gets the
+ * `/QR_Generator/` prefix, the single route is prerendered to
+ * `dist/client/index.html`, and Nitro (the Vercel server) is skipped. Without
+ * the flag the build is the default Vercel/Nitro output.
+ *
+ * `crawlLinks` stays off: the crawler follows the project-zip link and writes
+ * a rendered response over `QR_Generator.zip`.
+ */
+const PAGES_BASE_PATH = "/QR_Generator";
+const staticPages = process.env.STATIC_PAGES === "1";
+
 // `0.0.0.0:8080` is the live-preview contract — don't change host/port.
 // The dev server starts once `src/router.tsx` and `src/routes/` exist — see
 // AGENTS.md § "First scaffold".
 export default defineConfig(({ command, isPreview }) => ({
+  ...(staticPages ? { base: `${PAGES_BASE_PATH}/` } : {}),
+  // Lets app code drop links to files only the Nitro server can serve.
+  define: {
+    "import.meta.env.VITE_STATIC_PAGES": JSON.stringify(staticPages ? "1" : ""),
+  },
   server: {
     host: "0.0.0.0",
     port: 8080,
@@ -166,8 +184,16 @@ export default defineConfig(({ command, isPreview }) => ({
     // PWA head + ?install=1 tutorial page; runs before Start/Nitro.
     studioPwaPlugin(),
     tailwindcss(),
-    tanstackStart(),
-    ...(command === "build" || isPreview
+    tanstackStart(
+      staticPages
+        ? {
+            router: { basepath: PAGES_BASE_PATH },
+            prerender: { enabled: true, crawlLinks: false },
+            sitemap: { enabled: false },
+          }
+        : {},
+    ),
+    ...(!staticPages && (command === "build" || isPreview)
       ? [
           nitro({
             preset: "vercel",
