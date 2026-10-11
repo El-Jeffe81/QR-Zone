@@ -32,6 +32,19 @@ The downloaded PNG is exactly what the preview shows. Every combination is cover
 - Framed images are larger than plain ones (the shape has to fit around the code). Very large ones are capped at 4096 pixels per side by using a smaller module size; the app shows "reduced to fit" when that happens.
 - While a frame is on, error correction is at least **Quartile**. A lower choice is kept and comes back when the frame is set to None.
 
+### Error correction levels
+
+The selected level's description is shown under the Error correction buttons. Each button also uses it as its tooltip and accessible description.
+
+| Level | Description |
+| --- | --- |
+| Low | Recovers about 7% damage. Simplest, biggest squares. Best viewed on a screen. |
+| Medium | Recovers about 15%. A good balance for screens and standard printing. |
+| Quartile | Recovers about 25%. Used automatically with frames. Good for printed handouts. |
+| High | Recovers about 30%. Densest code. Survives smudges, folds, weather, or partial covering. |
+
+The description always follows your choice. When a frame raises a lower choice to Quartile, the note under the frame options says so.
+
 ### Sharing
 
 **Share** sits next to Download PNG.

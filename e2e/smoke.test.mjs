@@ -319,4 +319,30 @@ describe("static Pages build smoke test", () => {
     assert.deepEqual(errors, []);
     await context.close();
   });
+
+  it("shows the selected error correction level's description, and uses it as each button's tooltip", async () => {
+    const LEVEL_TEXT = {
+      Low: "Recovers about 7% damage. Simplest, biggest squares. Best viewed on a screen.",
+      Medium: "Recovers about 15%. A good balance for screens and standard printing.",
+      Quartile: "Recovers about 25%. Used automatically with frames. Good for printed handouts.",
+      High: "Recovers about 30%. Densest code. Survives smudges, folds, weather, or partial covering.",
+    };
+    const { fresh, context, errors } = await freshPage(() => {});
+    const group = fresh.getByRole("radiogroup", { name: "Error correction" });
+    const shown = fresh.locator("[data-ecc-description]");
+    for (const [name, text] of Object.entries(LEVEL_TEXT)) {
+      const radio = group.getByRole("radio", { name, exact: true });
+      await radio.check();
+      assert.equal((await shown.textContent()).trim(), text, `${name} description`);
+      assert.ok(await shown.isVisible());
+      const label = radio.locator("xpath=..");
+      assert.equal(await label.getAttribute("title"), text, `${name} tooltip`);
+      const description = await radio.evaluate((input) =>
+        document.getElementById(input.getAttribute("aria-describedby"))?.textContent?.trim(),
+      );
+      assert.equal(description, text, `${name} accessible description`);
+    }
+    assert.deepEqual(errors, []);
+    await context.close();
+  });
 });

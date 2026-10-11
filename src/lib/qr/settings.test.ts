@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { FRAME_SHAPES } from "./frames.ts";
 import {
   DEFAULT_SETTINGS,
+  ECC_OPTIONS,
   FRAME_FILL_OPTIONS,
   FRAME_SHAPE_OPTIONS,
   LEGACY_STORAGE_KEY,
@@ -216,5 +217,31 @@ describe("migrateLegacySettings", () => {
     const storage = memoryStorage();
     assert.equal(migrateLegacySettings(storage), false);
     assert.equal(storage.map.size, 0);
+  });
+});
+
+describe("error correction descriptions", () => {
+  it("match the approved text exactly, in order", () => {
+    assert.deepEqual(
+      ECC_OPTIONS.map(({ id, name, note }) => [id, name, note]),
+      [
+        [
+          "L",
+          "Low",
+          "Recovers about 7% damage. Simplest, biggest squares. Best viewed on a screen.",
+        ],
+        ["M", "Medium", "Recovers about 15%. A good balance for screens and standard printing."],
+        [
+          "Q",
+          "Quartile",
+          "Recovers about 25%. Used automatically with frames. Good for printed handouts.",
+        ],
+        [
+          "H",
+          "High",
+          "Recovers about 30%. Densest code. Survives smudges, folds, weather, or partial covering.",
+        ],
+      ],
+    );
   });
 });

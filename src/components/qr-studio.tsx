@@ -11,6 +11,7 @@ import {
   CORNER_STYLE_OPTIONS,
   DEFAULT_SETTINGS,
   DOT_SHAPE_OPTIONS,
+  ECC_OPTIONS,
   FRAME_COLOR_OPTIONS,
   FRAME_FILL_OPTIONS,
   FRAME_SHAPE_OPTIONS,
@@ -26,13 +27,6 @@ import {
 } from "@/lib/qr/settings";
 
 const QUIET_MODULES = 4;
-
-const LEVELS: { id: ErrorCorrectionLevel; name: string; recovery: string }[] = [
-  { id: "L", name: "Low", recovery: "7%" },
-  { id: "M", name: "Medium", recovery: "15%" },
-  { id: "Q", name: "Quartile", recovery: "25%" },
-  { id: "H", name: "High", recovery: "30%" },
-];
 
 type Ecc = ErrorCorrectionLevel;
 
@@ -708,18 +702,21 @@ export function QrStudio() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Segmented
-                legend="Error correction"
-                hint="Higher levels survive scratches and logos, and fit less text."
-                name="error-correction"
-                options={LEVELS.map((level) => ({
-                  id: level.id,
-                  name: level.name,
-                  note: `${level.recovery} recovery`,
-                }))}
-                value={ecc}
-                onChange={setEcc}
-              />
+              <div className="flex min-w-0 flex-col gap-1">
+                <Segmented
+                  legend="Error correction"
+                  hint="Higher levels survive scratches and logos, and fit less text."
+                  name="error-correction"
+                  options={ECC_OPTIONS}
+                  value={ecc}
+                  onChange={setEcc}
+                />
+                {/* The chosen level's description. Each radio already carries
+                    the same text as its description, so this isn't a live region. */}
+                <p data-ecc-description className="text-xs text-muted">
+                  {ECC_OPTIONS.find((level) => level.id === ecc)?.note}
+                </p>
+              </div>
               <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex items-baseline justify-between gap-3">
                   <label htmlFor={sizeId} className="text-sm font-medium">
