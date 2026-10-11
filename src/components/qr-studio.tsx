@@ -11,6 +11,7 @@ import {
   MODULE_MIN,
   STORAGE_KEY,
   SWATCHES,
+  migrateLegacySettings,
   parseSettings,
   serializeSettings,
 } from "@/lib/qr/settings";
@@ -238,6 +239,12 @@ export function QrStudio() {
   useEffect(() => {
     let raw: string | null = null;
     try {
+      // Settings saved under the pre-rename key carry over once.
+      migrateLegacySettings(localStorage);
+    } catch {
+      /* storage full or unavailable: read whatever is there below */
+    }
+    try {
       raw = localStorage.getItem(STORAGE_KEY);
     } catch {
       /* storage unavailable: keep the defaults */
@@ -311,13 +318,13 @@ export function QrStudio() {
           <QrCode className="size-6" />
         </span>
         <div className="min-w-0">
-          <h1 className="font-display text-3xl leading-tight font-medium text-balance sm:text-5xl">Quiet Zone</h1>
+          <h1 className="font-display text-3xl leading-tight font-medium text-balance sm:text-5xl">QR Zone</h1>
           <p className="mt-2 max-w-xl text-pretty text-muted">
             Type a URL or any text. The code redraws immediately — then save a PNG.
           </p>
           <a
-            href={`${import.meta.env.BASE_URL}QR_Generator.zip`}
-            download="QR_Generator.zip"
+            href={`${import.meta.env.BASE_URL}QR-Zone.zip`}
+            download="QR-Zone.zip"
             className="mt-4 inline-flex h-11 items-center rounded-lg bg-accent px-4 font-semibold text-field"
           >
             Download project zip

@@ -235,12 +235,12 @@ test("does not emit x:game:image without a public host or banner", () => {
   assert.doesNotMatch(noBanner, /x:game:image/);
 });
 
-test("site title Quiet Zone is a real name, not a sentinel", () => {
+test("site title QR Zone is a real name, not a sentinel", () => {
   const out = injectStudioPwaHead("<html><head></head></html>", {
     host: "wild-race.studio.example",
-    site: { title: "Quiet Zone" },
+    site: { title: "QR Zone" },
   });
-  assert.match(out, /property="og:title" content="Quiet Zone"/);
+  assert.match(out, /property="og:title" content="QR Zone"/);
 });
 
 test("published studio.example slug is still a title fallback", () => {
@@ -449,14 +449,14 @@ test("strips install params from the app link", () => {
 });
 
 test("names the install page from host slug", () => {
-  assert.equal(appNameFromHost("localhost:8080"), "Quiet Zone");
-  assert.equal(appNameFromHost("172.17.154.217:8080"), "Quiet Zone");
+  assert.equal(appNameFromHost("localhost:8080"), "QR Zone");
+  assert.equal(appNameFromHost("172.17.154.217:8080"), "QR Zone");
   assert.equal(appNameFromHost("wild-race.studio.example"), "Wild Race");
 });
 
 test("rejects hosts that are not plain slugs", () => {
-  assert.equal(appNameFromHost("<script>alert(1)</script>"), "Quiet Zone");
-  assert.equal(appNameFromHost('"><img src=x onerror=1>.studio.example'), "Quiet Zone");
+  assert.equal(appNameFromHost("<script>alert(1)</script>"), "QR Zone");
+  assert.equal(appNameFromHost('"><img src=x onerror=1>.studio.example'), "QR Zone");
 });
 
 test("renders install page markup", () => {

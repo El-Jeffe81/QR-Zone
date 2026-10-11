@@ -144,15 +144,15 @@ function authPopupPlugin(): Plugin {
 
 /**
  * `STATIC_PAGES=1` builds a fully static copy for GitHub Pages, served from
- * https://el-jeffe81.github.io/QR_Generator/: every URL gets the
- * `/QR_Generator/` prefix, the single route is prerendered to
+ * https://el-jeffe81.github.io/QR-Zone/: every URL gets the
+ * `/QR-Zone/` prefix, the single route is prerendered to
  * `dist/client/index.html`, and Nitro (the Vercel server) is skipped. Without
  * the flag the build is the default Vercel/Nitro output.
  *
  * `crawlLinks` stays off: the crawler follows the project-zip link and writes
- * a rendered response over `QR_Generator.zip`.
+ * a rendered response over `QR-Zone.zip`.
  */
-const PAGES_BASE_PATH = "/QR_Generator";
+const PAGES_BASE_PATH = "/QR-Zone";
 const staticPages = process.env.STATIC_PAGES === "1";
 
 // `0.0.0.0:8080` is the live-preview contract — don't change host/port.

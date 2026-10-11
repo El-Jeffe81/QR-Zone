@@ -6,7 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-export const DEFAULT_APP_NAME = "Quiet Zone";
+export const DEFAULT_APP_NAME = "QR Zone";
 export const OG_SERVICE_URL_DEFAULT = "https://og.studio.example";
 export const OG_SITE_REL_PATH = "src/lib/og/site.json";
 
