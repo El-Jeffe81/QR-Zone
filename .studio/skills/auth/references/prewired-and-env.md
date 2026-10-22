@@ -18,8 +18,8 @@
 
 - **Live preview** (`*.studio-sandboexample.com`): the app is an embedded iframe, so
   sign-in opens a **popup** (a top-level redirect to the broker can't work inside
-  the iframe) and federates via a baked shared **preview client**
-  (`src/lib/auth/preview.ts`). The handler 302s straight to the broker/upstream
+  the iframe) and federates via the broker client named by `STUDIO_AUTH_CLIENT_ID` /
+  `STUDIO_AUTH_CLIENT_SECRET` (no client is baked into the source). The handler 302s straight to the broker/upstream
   login; on return the popup posts the session bearer back in a tiny HTML page.
   Sessions (and email/password users) persist in the app's embedded PGLite DB —
   the SAME DB as app data — and, since the iframe's cookies are partitioned,
@@ -31,9 +31,9 @@
 ## Env vars — do **not** create a `.env` file
 
 **Never write a `.env` / `.env.local` / `.env.example` for auth (or anything
-else) in this sandbox.** Live preview sign-in works out of the box with **zero**
-env configuration: the server falls back to the baked preview client in
-`src/lib/auth/preview.ts`, derives the `*.studio-sandboexample.com` origin per-request,
+else) in this sandbox.** Live preview sign-in needs `STUDIO_AUTH_CLIENT_ID` /
+`STUDIO_AUTH_CLIENT_SECRET` in the process env (there is no baked-in fallback
+client; without them federated sign-in is off). The server derives the `*.studio-sandboexample.com` origin per-request,
 mints a process-stable session secret, and persists sessions in embedded
 PGLite. Deployed apps get `STUDIO_AUTH_*` / `BETTER_AUTH_*` / `DATABASE_URL`
 injected by the platform — still not something you write into a file.
@@ -47,8 +47,8 @@ these in a file you create):
 | `BETTER_AUTH_URL` | server | app's own public origin; unset in preview (origin is derived per-request) |
 | `BETTER_AUTH_SECRET` | server | signs this app's own sessions (process-stable fallback in preview; survives HMR) |
 | `STUDIO_AUTH_ISSUER` | server | the shared broker (defaults to `https://auth.studio.example`) |
-| `STUDIO_AUTH_CLIENT_ID` / `STUDIO_AUTH_CLIENT_SECRET` | server | per-app client (falls back to the preview client) |
+| `STUDIO_AUTH_CLIENT_ID` / `STUDIO_AUTH_CLIENT_SECRET` | server | per-app broker client; required for federated sign-in (no default) |
 | `DATABASE_URL` | server | when deployed, Better Auth persists here (preview persists to the embedded PGLite — same DB as app data) |
 
-Never expose a non-`VITE_` var to the client. The preview client id/secret live
-server-only in `src/lib/auth/preview.ts`.
+Never expose a non-`VITE_` var to the client. Never commit a client
+secret to the source; read it from the env only.

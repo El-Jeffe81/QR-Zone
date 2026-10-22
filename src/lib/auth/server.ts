@@ -14,9 +14,9 @@
  * Tri-mode:
  *   - Deployed: the deployer injects a per-app `STUDIO_AUTH_*` + `BETTER_AUTH_URL`
  *     + `DATABASE_URL`, so real federated auth is persisted in Postgres.
- *   - Sandbox live preview: no injection -> falls back to the shared **preview
- *     client** (`./preview`) and derives the preview's `https://*.studio-sandboexample.com`
- *     origin from the request, so real sign-in works (no demo users). Sessions
+ *   - Sandbox live preview: set `STUDIO_AUTH_CLIENT_ID` / `STUDIO_AUTH_CLIENT_SECRET`
+ *     yourself (there is no baked-in preview client any more); the preview's
+ *     `https://*.studio-sandboexample.com` origin is derived from the request. Sessions
  *     and identities persist in the embedded PGLite DB (same DB as app data);
  *     the process restart wipes both. Live-preview iframe clients use a bearer
  *     token (partitioned cookies) — see `client.ts`.
@@ -24,7 +24,7 @@
  *     `requireUserId` resolves a dev user with no database configured, and
  *     throws fail-closed once `DATABASE_URL` is set (see `verify.server.ts`).
  *
- * NEVER import this from client code — it pulls in `pg` + the preview secret +
+ * NEVER import this from client code — it pulls in `pg` + auth secrets +
  * server-only Better Auth internals. The client uses `@/lib/auth/client`;
  * components read the user via `@/lib/auth/use-current-user`; server functions get
  * a verified id via `@/lib/auth/middleware`.
@@ -40,12 +40,7 @@ import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { STUDIO_PROVIDERS } from "./providers";
 import { pgliteDialect } from "./pglite-dialect";
-import {
-  STUDIO_ISSUER_DEFAULT,
-  PREVIEW_ALLOWED_HOSTS,
-  PREVIEW_CLIENT_ID,
-  PREVIEW_CLIENT_SECRET,
-} from "./preview";
+import { STUDIO_ISSUER_DEFAULT, PREVIEW_ALLOWED_HOSTS } from "./preview";
 
 // Kick (and share) PGLite bootstrap as soon as the auth server module loads.
 void ensureDbReady();
@@ -74,12 +69,12 @@ const env = (key: string): string | undefined => {
 // provisions auth; set it to "false" to force auth off everywhere (dev user).
 const authDisabled = env("VITE_AUTH_ENABLED") === "false";
 
-// Broker federation creds: the deployer injects a per-app client when deployed;
-// otherwise fall back to the shared live-preview client, which the broker accepts
-// for any `*.studio-sandboexample.com` callback (see `./preview`).
+// Broker federation creds come ONLY from the environment (the deployer injects a
+// per-app client when deployed). There is deliberately no baked-in fallback
+// client: without both vars, federated sign-in is off (`authConfigured` false).
 const studioIssuer = env("STUDIO_AUTH_ISSUER") ?? STUDIO_ISSUER_DEFAULT;
-const studioClientId = env("STUDIO_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
-const studioClientSecret = env("STUDIO_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
+const studioClientId = env("STUDIO_AUTH_CLIENT_ID");
+const studioClientSecret = env("STUDIO_AUTH_CLIENT_SECRET");
 
 /** True when federated sign-in is active (real auth is enforced). */
 export const authConfigured =

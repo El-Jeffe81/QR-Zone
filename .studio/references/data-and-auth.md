@@ -54,8 +54,8 @@ and `auth` skills.
   the rule about not adding a React route there.
 - Read the user with `useCurrentUser()` (`@/lib/auth/use-current-user`) and gate
   UI with `SignedIn` / `SignedOut` / `UserButton` (`@/lib/auth/gates`).
-- Sign-in is **real even in the live preview** — it federates via a baked shared
-  preview client — so a visitor is signed out until they sign in. Build real
+- Sign-in is **real even in the live preview** — it federates via the broker client in
+  `STUDIO_AUTH_CLIENT_*` (env only, no baked client) — so a visitor is signed out until they sign in. Build real
   sign-in; do **NOT** scaffold demo/mock/hardcoded users.
 - **Authorize every server function** with `authMiddleware`
   (`@/lib/auth/middleware`): `createServerFn().middleware([authMiddleware])`
@@ -76,7 +76,7 @@ flag (exit 0 agree, 1 diverged, 2 could not observe).
 ## Env
 
 On deploy the platform injects `DATABASE_URL` + per-app auth creds; live preview
-needs neither (baked preview client, PGLite fallback). Deployed behind the gate,
+needs no database (PGLite fallback) but needs `STUDIO_AUTH_CLIENT_*` for sign-in. Deployed behind the gate,
 signed-in Studio viewers get the app session automatically from `x-studio-identity`
 (see the `auth` skill — `references/studio-identity.md`); the broker federation
 covers anonymous viewers and no-gate contexts.
