@@ -1,0 +1,6 @@
+# Historical finding only. The app-builder template's live-preview OAuth client
+# secret was committed in fec3147 and removed from the tree in the commit that
+# added this file. It stays in git history, so the full-history scan would
+# still report it. This fingerprint ignores exactly that one finding
+# (commit + file + rule + line); any other occurrence still fails the scan.
+fec3147228305b7f5b1db41748b82cfdfd906309:src/lib/auth/preview.ts:generic-api-key:20

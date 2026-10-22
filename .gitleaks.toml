@@ -1,0 +1,7 @@
+# gitleaks configuration: the default rule set, unchanged.
+# Known historical findings are ignored one at a time, by fingerprint, in
+# .gitleaksignore (commit:file:rule:line), never by path or rule here.
+title = "QR-Zone gitleaks config"
+
+[extend]
+useDefault = true
