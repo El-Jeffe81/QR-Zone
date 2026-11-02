@@ -118,3 +118,10 @@ npx serve /tmp/pages   # or any static server; then open /QR-Zone/
 ## History
 
 This project was called **Quiet Zone** and lived at `El-Jeffe81/QR_Generator`. GitHub redirects the old repository URL, but the old Pages address (`https://el-jeffe81.github.io/QR_Generator/`) no longer works; use https://el-jeffe81.github.io/QR-Zone/.
+
+## Accounts and services
+
+- **GitHub Pages** – hosts the live site (published by `.github/workflows/pages.yml`).
+- **GitHub Actions** – CI (`ci.yml`) and the Pages deploy.
+- **Neon Postgres** – template/optional only: the project scaffolding supports it via `DATABASE_URL`, but the live app uses no database.
+- **Vercel** – a Vercel build config is present (`npm run build`), but it is not the live host.
